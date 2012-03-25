@@ -16,6 +16,7 @@
 
 #include <stdio.h>
 #include <unistd.h>
+#include "xposed.h"
 
 namespace android {
 
@@ -23,6 +24,7 @@ void app_usage()
 {
     fprintf(stderr,
         "Usage: app_process [java-options] cmd-dir start-class-name [options]\n");
+    fprintf(stderr, "   with Xposed support (version %s)\n", XPOSED_VERSION);
 }
 
 class AppRuntime : public AndroidRuntime
@@ -52,6 +54,8 @@ public:
 
     virtual void onVmCreated(JNIEnv* env)
     {
+        keepLoadingXposed = xposedOnVmCreated(env, mClassName);
+
         if (mClassName == NULL) {
             return; // Zygote. Nothing to do here.
         }
@@ -84,9 +88,13 @@ public:
         sp<ProcessState> proc = ProcessState::self();
         LOGV("App process: starting thread pool.\n");
         proc->startThreadPool();
+        
+        xposedCallStaticVoidMethod(getJNIEnv(), "onStartedBeforeMain");
 
         AndroidRuntime* ar = AndroidRuntime::getRuntime();
         ar->callMain(mClassName, mClass, mArgC, mArgV);
+        
+        xposedCallStaticVoidMethod(getJNIEnv(), "onStartedAfterMain");
 
         IPCThreadState::self()->stopProcess();
     }
@@ -96,10 +104,14 @@ public:
         sp<ProcessState> proc = ProcessState::self();
         LOGV("App process: starting thread pool.\n");
         proc->startThreadPool();
+        
+        xposedCallStaticVoidMethod(getJNIEnv(), "onZygoteInit");
     }
 
     virtual void onExit(int code)
     {
+        xposedCallStaticVoidMethod(getJNIEnv(), "onExit");
+    
         if (mClassName == NULL) {
             // if zygote
             IPCThreadState::self()->stopProcess();
@@ -184,6 +196,8 @@ int main(int argc, const char* const argv[])
     }
 
     runtime.mParentDir = parentDir;
+    
+    addXposedToClasspath(zygote);
 
     if (zygote) {
         runtime.start("com.android.internal.os.ZygoteInit",
@@ -202,3 +216,4 @@ int main(int argc, const char* const argv[])
         return 10;
     }
 }
+
