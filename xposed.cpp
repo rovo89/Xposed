@@ -13,15 +13,6 @@
 namespace android {
 
 ////////////////////////////////////////////////////////////
-// definitions
-////////////////////////////////////////////////////////////
-
-#define XPOSED_JAR "/data/framework/HelloWorld.apk"
-#define XPOSED_JAR_NEWVERSION "/data/framework/HelloWorld.apk.newversion"
-#define XPOSED_CLASS "de/robv/android/xposed/XposedBridge"
-#define XPOSED_VERSION "0.1"
-
-////////////////////////////////////////////////////////////
 // variables
 ////////////////////////////////////////////////////////////
 bool keepLoadingXposed = false;
@@ -262,7 +253,7 @@ static jobject xposedAddLocalReference(Object* obj) {
 // JNI methods
 ////////////////////////////////////////////////////////////
 
-static void de_robv_android_xposed_XposedBridge_hookMethod(JNIEnv* env, jclass clazz, jobject reflectedMethod) {
+static void de_robv_android_xposed_XposedBridge_hookMethodNative(JNIEnv* env, jclass clazz, jobject reflectedMethod) {
     // Usage errors?
     if (reflectedMethod == NULL) {
         dvmThrowIllegalArgumentException("method must not be null");
@@ -310,16 +301,16 @@ static jobject de_robv_android_xposed_XposedBridge_invokeOriginalMethodNative(JN
     return xposedAddLocalReference(result);
 }
 
-static void de_robv_android_xposed_XposedBridge_setClassModifiers(JNIEnv* env, jclass clazz, jobject reflectClass, jint modifiers) {
+static void de_robv_android_xposed_XposedBridge_setClassModifiersNative(JNIEnv* env, jclass clazz, jobject reflectClass, jint modifiers) {
     ClassObject* classObj = (ClassObject*) dvmDecodeIndirectRef(dvmThreadSelf(), reflectClass);
     LOGE("description %s", classObj->descriptor);
     classObj->accessFlags |= ACC_PUBLIC;
 }
 
 static const JNINativeMethod xposedMethods[] = {
-    {"hookMethod", "(Ljava/lang/reflect/Method;)V", (void*)de_robv_android_xposed_XposedBridge_hookMethod},
+    {"hookMethodNative", "(Ljava/lang/reflect/Method;)V", (void*)de_robv_android_xposed_XposedBridge_hookMethodNative},
     {"invokeOriginalMethodNative", "(Ljava/lang/reflect/Method;[Ljava/lang/Class;Ljava/lang/Class;Ljava/lang/Object;[Ljava/lang/Object;)Ljava/lang/Object;", (void*)de_robv_android_xposed_XposedBridge_invokeOriginalMethodNative},
-    {"setClassModifiers", "(Ljava/lang/Class;I)V", (void*)de_robv_android_xposed_XposedBridge_setClassModifiers},
+    {"setClassModifiersNative", "(Ljava/lang/Class;I)V", (void*)de_robv_android_xposed_XposedBridge_setClassModifiersNative},
 };
 
 static int register_de_robv_android_xposed_XposedBridge(JNIEnv* env) {
