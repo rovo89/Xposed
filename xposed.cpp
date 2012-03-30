@@ -232,6 +232,9 @@ static XposedOriginalMethodsIt findXposedOriginalMethod(const Method* method) {
     return xposedOriginalMethods.end();
 }
 
+
+// work-around to get a reference wrapper to an object so that it can be used
+// for certain calls to the JNI environment
 static jobject xposedAddLocalReference(Object* obj) {
     if (obj == NULL) {
         return NULL;
@@ -281,6 +284,8 @@ static void de_robv_android_xposed_XposedBridge_hookMethodNative(JNIEnv* env, jc
     method->registersSize = method->insSize;
 }
 
+// simplified copy of Method.invokeNative, but calls the original (non-hooked) method and has no access checks
+// used when a method has been hooked
 static jobject de_robv_android_xposed_XposedBridge_invokeOriginalMethodNative(JNIEnv* env, jclass clazz, jobject reflectedMethod,
             jobjectArray params1, jclass returnType1, jobject thisObject1, jobjectArray args1) {
     // try to find the original method
