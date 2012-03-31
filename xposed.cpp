@@ -26,6 +26,12 @@ std::list<Method> xposedOriginalMethods;
 ////////////////////////////////////////////////////////////
 
 void addXposedToClasspath(bool zygote) {
+    // is the blocker file present?
+    if (access(XPOSED_LOAD_BLOCKER, F_OK) == 0) {
+        LOGE("found %s, not loading Xposed\n", XPOSED_LOAD_BLOCKER);
+        return;
+    }
+
     // do we have a new version and are (re)starting zygote? Then load it!
     if (zygote && access(XPOSED_JAR_NEWVERSION, R_OK) == 0) {
         LOGI("Found new Xposed jar version, activating it\n");
