@@ -19,6 +19,7 @@ LOCAL_C_INCLUDES += dalvik \
                     bionic/ \
                     bionic/libstdc++/include
 
-LOCAL_MODULE:= app_process
+LOCAL_MODULE:= xposed
+LOCAL_MODULE_TAGS := optional
 
 include $(BUILD_EXECUTABLE)
