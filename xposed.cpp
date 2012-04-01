@@ -246,13 +246,24 @@ static jobject xposedAddLocalReference(Object* obj) {
         return NULL;
     }
 
+    // first get a global reference, because it is much less error-prone than local references
+    pthread_mutex_lock(&gDvm.jniGlobalRefLock);
+    jobject globalRef = (jobject) gDvm.jniGlobalRefTable.add(IRT_FIRST_SEGMENT, obj);
+    pthread_mutex_unlock(&gDvm.jniGlobalRefLock);
+    if (globalRef == NULL) {
+        gDvm.jniGlobalRefTable.dump("JNI global");
+        LOGE("Failed adding to JNI global ref table (%zd entries)",
+                gDvm.jniGlobalRefTable.capacity());
+        dvmAbort();
+    }
+    
+    // then get an official local reference
     JNIEnv* env = AndroidRuntime::getJNIEnv();
-    bool oldWorkaroundValue = gDvmJni.workAroundAppJniBugs;
-    gDvmJni.workAroundAppJniBugs = true;
-    jobject globalRef = env->NewGlobalRef((jobject)obj);
-    gDvmJni.workAroundAppJniBugs = oldWorkaroundValue;
     jobject localRef = env->NewLocalRef(globalRef);
+    
+    // and free the global reference
     env->DeleteGlobalRef(globalRef);
+
     return localRef;
 }
 
