@@ -24,7 +24,7 @@ void app_usage()
 {
     fprintf(stderr,
         "Usage: app_process [java-options] cmd-dir start-class-name [options]\n");
-    fprintf(stderr, "   with Xposed support (version %s)\n", XPOSED_VERSION);
+    fprintf(stderr, "   with Xposed support (version " XPOSED_VERSION ")\n");
 }
 
 class AppRuntime : public AndroidRuntime
