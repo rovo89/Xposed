@@ -132,9 +132,6 @@ void xposedCallStaticVoidMethod(JNIEnv* env, const char* methodName) {
 ////////////////////////////////////////////////////////////
 
 static void xposedCallHandler(const u4* args, JValue* pResult, const Method* method, ::Thread* self) {
-    printf("here I am\n");
-    LOGE("here I am");
-    
     XposedOriginalMethodsIt original = findXposedOriginalMethod(method);
     if (original == xposedOriginalMethods.end()) {
         dvmThrowNoSuchMethodError("could not find Xposed original method - how did you even get here?");
@@ -217,8 +214,6 @@ static void xposedCallHandler(const u4* args, JValue* pResult, const Method* met
             dvmThrowClassCastException(result->clazz, returnType);
         }
     }
-
-    printf("this is me\n");
 }
 
 
