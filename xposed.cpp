@@ -10,6 +10,10 @@
 #include <stdio.h>
 #include <sys/stat.h>
 
+#ifdef WITH_JIT
+#include <interp/Jit.h>
+#endif
+
 namespace android {
 
 ////////////////////////////////////////////////////////////
@@ -294,6 +298,11 @@ static void de_robv_android_xposed_XposedBridge_hookMethodNative(JNIEnv* env, jc
     SET_METHOD_FLAG(method, ACC_NATIVE);
     method->nativeFunc = &xposedCallHandler;
     method->registersSize = method->insSize;
+    method->outsSize = 0;
+    #ifdef WITH_JIT
+    LOGI("reset JIT\n");
+    dvmJitResetTable();
+    #endif
 }
 
 // simplified copy of Method.invokeNative, but calls the original (non-hooked) method and has no access checks

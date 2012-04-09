@@ -22,4 +22,6 @@ LOCAL_C_INCLUDES += dalvik \
 LOCAL_MODULE:= xposed
 LOCAL_MODULE_TAGS := optional
 
+LOCAL_CFLAGS += -DWITH_JIT
+
 include $(BUILD_EXECUTABLE)
