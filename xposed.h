@@ -11,7 +11,7 @@ namespace android {
 #define XPOSED_JAR_NEWVERSION XPOSED_JAR ".newversion"
 #define XPOSED_LOAD_BLOCKER "/data/xposed/disabled"
 #define XPOSED_CLASS "de/robv/android/xposed/XposedBridge"
-#define XPOSED_VERSION "0.5"
+#define XPOSED_VERSION "1.0"
 
 extern bool keepLoadingXposed;
 typedef std::list<Method>::iterator XposedOriginalMethodsIt;
