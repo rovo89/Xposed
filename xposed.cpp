@@ -195,6 +195,10 @@ static void xposedCallHandler(const u4* args, JValue* pResult, const Method* met
         case 'L':
             obj  = (Object*) args[srcIndex++];
             break;
+        default:
+            LOGE("Unknown method signature description character: %c\n", descChar);
+            obj = NULL;
+            srcIndex++;
         }
         env->SetObjectArrayElement(argsArray, dstIndex++, xposedAddLocalReference(self, obj));
     }
