@@ -142,11 +142,14 @@ static void xposedCallHandler(const u4* args, JValue* pResult, const Method* met
         return;
     }
     
-    assert(method->insSize == original->insSize);
-    JNIEnv* env = AndroidRuntime::getJNIEnv();
+    ThreadStatus oldThreadStatus = self->status;
+    JNIEnv* env = self->jniEnv;
     
     // get java.lang.reflect.Method object for original method
-    jobject originalReflected = env->ToReflectedMethod((jclass)xposedAddLocalReference(original->clazz), (jmethodID)method, true);
+    jobject originalReflected = env->ToReflectedMethod(
+        (jclass)xposedAddLocalReference(self, original->clazz),
+        (jmethodID)method,
+        true);
   
     // convert/box arguments
     const char* desc = &method->shorty[1]; // [0] is the return type.
@@ -157,7 +160,7 @@ static void xposedCallHandler(const u4* args, JValue* pResult, const Method* met
     
     // for non-static methods determine the "this" pointer
     if (!dvmIsStaticMethod(&(*original))) {
-        thisObject = (Object*) xposedAddLocalReference((Object*)args[0]);
+        thisObject = (Object*) xposedAddLocalReference(self, (Object*)args[0]);
         srcIndex++;
         numArgs--;
     }
@@ -193,18 +196,21 @@ static void xposedCallHandler(const u4* args, JValue* pResult, const Method* met
             obj  = (Object*) args[srcIndex++];
             break;
         }
-        env->SetObjectArrayElement(argsArray, dstIndex++, xposedAddLocalReference(obj));
+        env->SetObjectArrayElement(argsArray, dstIndex++, xposedAddLocalReference(self, obj));
     }
     
     // call the Java handler function
-    jobject resultRef = env->CallStaticObjectMethod(xposedClass, xposedHandleHookedMethod, originalReflected, thisObject, argsArray);
+    jobject resultRef = env->CallStaticObjectMethod(
+        xposedClass, xposedHandleHookedMethod, originalReflected, thisObject, argsArray);
+        
     // exceptions are thrown to the caller
     if (env->ExceptionCheck()) {
+        dvmChangeStatus(self, oldThreadStatus);
         return;
     }
     
     // return result with proper type
-    Object* result = dvmDecodeIndirectRef(dvmThreadSelf(), resultRef);
+    Object* result = dvmDecodeIndirectRef(self, resultRef);
     ClassObject* returnType = dvmGetBoxedReturnType(method);
     if (returnType->primitiveType == PRIM_VOID) {
         // ignored
@@ -218,6 +224,9 @@ static void xposedCallHandler(const u4* args, JValue* pResult, const Method* met
             dvmThrowClassCastException(result->clazz, returnType);
         }
     }
+    
+    // set the thread status back to running. must be done after the last env->...()
+    dvmChangeStatus(self, oldThreadStatus);
 }
 
 
@@ -239,31 +248,27 @@ static XposedOriginalMethodsIt findXposedOriginalMethod(const Method* method) {
 
 
 // work-around to get a reference wrapper to an object so that it can be used
-// for certain calls to the JNI environment
-static jobject xposedAddLocalReference(Object* obj) {
+// for certain calls to the JNI environment. almost verbatim copy from Jni.cpp
+static jobject xposedAddLocalReference(::Thread* self, Object* obj) {
     if (obj == NULL) {
         return NULL;
     }
 
-    // first get a global reference, because it is much less error-prone than local references
-    pthread_mutex_lock(&gDvm.jniGlobalRefLock);
-    jobject globalRef = (jobject) gDvm.jniGlobalRefTable.add(IRT_FIRST_SEGMENT, obj);
-    pthread_mutex_unlock(&gDvm.jniGlobalRefLock);
-    if (globalRef == NULL) {
-        gDvm.jniGlobalRefTable.dump("JNI global");
-        LOGE("Failed adding to JNI global ref table (%zd entries)",
-                gDvm.jniGlobalRefTable.capacity());
-        dvmAbort();
+    IndirectRefTable* pRefTable = &self->jniLocalRefTable;
+    void* curFrame = self->interpSave.curFrame;
+    u4 cookie = SAVEAREA_FROM_FP(curFrame)->xtra.localRefCookie;
+    jobject jobj = (jobject) pRefTable->add(cookie, obj);
+    if (UNLIKELY(jobj == NULL)) {
+        pRefTable->dump("JNI local");
+        LOGE("Failed adding to JNI local ref table (has %zd entries)", pRefTable->capacity());
+        dvmDumpThread(self, false);
+        dvmAbort();     // spec says call FatalError; this is equivalent
     }
-    
-    // then get an official local reference
-    JNIEnv* env = AndroidRuntime::getJNIEnv();
-    jobject localRef = env->NewLocalRef(globalRef);
-    
-    // and free the global reference
-    env->DeleteGlobalRef(globalRef);
-
-    return localRef;
+    if (UNLIKELY(gDvmJni.workAroundAppJniBugs)) {
+        // Hand out direct pointers to support broken old apps.
+        return reinterpret_cast<jobject>(obj);
+    }
+    return jobj;
 }
 
 
@@ -300,7 +305,6 @@ static void de_robv_android_xposed_XposedBridge_hookMethodNative(JNIEnv* env, jc
     method->registersSize = method->insSize;
     method->outsSize = 0;
     #ifdef WITH_JIT
-    LOGI("reset JIT\n");
     dvmJitResetTable();
     #endif
 }
@@ -317,14 +321,15 @@ static jobject de_robv_android_xposed_XposedBridge_invokeOriginalMethodNative(JN
     }
 
     // dereference parameters
-    Object* thisObject = dvmDecodeIndirectRef(dvmThreadSelf(), thisObject1);
-    ArrayObject* args = (ArrayObject*)dvmDecodeIndirectRef(dvmThreadSelf(), args1);
-    ArrayObject* params = (ArrayObject*)dvmDecodeIndirectRef(dvmThreadSelf(), params1);
-    ClassObject* returnType = (ClassObject*)dvmDecodeIndirectRef(dvmThreadSelf(), returnType1);
+    ::Thread* self = dvmThreadSelf();
+    Object* thisObject = dvmDecodeIndirectRef(self, thisObject1);
+    ArrayObject* args = (ArrayObject*)dvmDecodeIndirectRef(self, args1);
+    ArrayObject* params = (ArrayObject*)dvmDecodeIndirectRef(self, params1);
+    ClassObject* returnType = (ClassObject*)dvmDecodeIndirectRef(self, returnType1);
     
     // invoke the method
     Object* result = dvmInvokeMethod(thisObject, method, args, params, returnType, true);
-    return xposedAddLocalReference(result);
+    return xposedAddLocalReference(self, result);
 }
 
 static void de_robv_android_xposed_XposedBridge_setClassModifiersNative(JNIEnv* env, jclass clazz, jobject reflectClass, jint modifiers) {

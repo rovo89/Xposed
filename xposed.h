@@ -11,7 +11,7 @@ namespace android {
 #define XPOSED_JAR_NEWVERSION XPOSED_JAR ".newversion"
 #define XPOSED_LOAD_BLOCKER "/data/xposed/disabled"
 #define XPOSED_CLASS "de/robv/android/xposed/XposedBridge"
-#define XPOSED_VERSION "1.0"
+#define XPOSED_VERSION "1.1"
 
 extern bool keepLoadingXposed;
 typedef std::list<Method>::iterator XposedOriginalMethodsIt;
@@ -24,7 +24,7 @@ void xposedCallStaticVoidMethod(JNIEnv* env, const char* methodName);
 // handling hooked methods
 static void xposedCallHandler(const u4* args, JValue* pResult, const Method* method, ::Thread* self);
 static XposedOriginalMethodsIt findXposedOriginalMethod(const Method* method);
-static jobject xposedAddLocalReference(Object* obj);
+static jobject xposedAddLocalReference(::Thread* self, Object* obj);
 
 // JNI methods
 static void de_robv_android_xposed_XposedBridge_hookMethodNative(JNIEnv* env, jclass clazz, jobject reflectedMethod);
