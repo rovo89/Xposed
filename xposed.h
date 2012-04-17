@@ -21,10 +21,11 @@ void addXposedToClasspath(bool zygote);
 bool xposedOnVmCreated(JNIEnv* env, const char* loadedClassName);
 void xposedCallStaticVoidMethod(JNIEnv* env, const char* methodName);
 
-// handling hooked methods
+// handling hooked methods / helpers
 static void xposedCallHandler(const u4* args, JValue* pResult, const Method* method, ::Thread* self);
 static XposedOriginalMethodsIt findXposedOriginalMethod(const Method* method);
 static jobject xposedAddLocalReference(::Thread* self, Object* obj);
+static void replaceAsm(void* function, char* newCode, int len);
 
 // JNI methods
 static void de_robv_android_xposed_XposedBridge_hookMethodNative(JNIEnv* env, jclass clazz, jobject reflectedMethod);

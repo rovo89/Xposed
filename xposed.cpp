@@ -9,6 +9,7 @@
 
 #include <stdio.h>
 #include <sys/stat.h>
+#include <sys/mman.h>
 
 #ifdef WITH_JIT
 #include <interp/Jit.h>
@@ -64,6 +65,13 @@ void addXposedToClasspath(bool zygote) {
 bool xposedOnVmCreated(JNIEnv* env, const char* loadedClassName) {
     if (!keepLoadingXposed)
         return false;
+        
+    // disable some access checks
+    char asmReturnTrue[] = { 0x01, 0x20, 0x70, 0x47 };
+    replaceAsm((void*) &dvmCheckClassAccess,  asmReturnTrue, sizeof(asmReturnTrue));
+    replaceAsm((void*) &dvmCheckMethodAccess, asmReturnTrue, sizeof(asmReturnTrue));
+    replaceAsm((void*) &dvmCheckFieldAccess,  asmReturnTrue, sizeof(asmReturnTrue));
+    replaceAsm((void*) &dvmInSamePackage,     asmReturnTrue, sizeof(asmReturnTrue));
 
     xposedClass = env->FindClass(XPOSED_CLASS);
     xposedClass = reinterpret_cast<jclass>(env->NewGlobalRef(xposedClass));
@@ -132,7 +140,7 @@ void xposedCallStaticVoidMethod(JNIEnv* env, const char* methodName) {
 
 
 ////////////////////////////////////////////////////////////
-// handling hooked methods
+// handling hooked methods / helpers
 ////////////////////////////////////////////////////////////
 
 static void xposedCallHandler(const u4* args, JValue* pResult, const Method* method, ::Thread* self) {
@@ -273,6 +281,14 @@ static jobject xposedAddLocalReference(::Thread* self, Object* obj) {
         return reinterpret_cast<jobject>(obj);
     }
     return jobj;
+}
+
+static void replaceAsm(void* function, char* newCode, int len) {
+    function = (void*)((int)function & ~1);
+    void* pageStart = (void*)((int)function & ~(PAGESIZE-1));
+    mprotect(pageStart, PAGESIZE, PROT_READ | PROT_WRITE | PROT_EXEC);
+    memcpy(function, newCode, len);
+    mprotect(pageStart, PAGESIZE, PROT_READ | PROT_EXEC);
 }
 
 
