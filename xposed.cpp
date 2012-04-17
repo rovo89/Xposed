@@ -309,7 +309,8 @@ static void de_robv_android_xposed_XposedBridge_hookMethodNative(JNIEnv* env, jc
     method->registersSize = method->insSize;
     method->outsSize = 0;
     #ifdef WITH_JIT
-    dvmJitResetTable();
+    // reset JIT cache
+    gDvmJit.codeCacheFull = true;
     #endif
 }
 
