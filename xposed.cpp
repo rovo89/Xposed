@@ -7,6 +7,10 @@
 #include <utils/Log.h>
 #include <android_runtime/AndroidRuntime.h>
 
+#define private public
+#include <utils/ResourceTypes.h>
+#undef private
+
 #include <stdio.h>
 #include <sys/stat.h>
 #include <sys/mman.h>
@@ -23,6 +27,9 @@ namespace android {
 bool keepLoadingXposed = false;
 jclass xposedClass = NULL;
 jmethodID xposedHandleHookedMethod = NULL;
+jclass xresourcesClass = NULL;
+jmethodID xresourcesTranslateResId = NULL;
+jmethodID xresourcesTranslateAttrId = NULL;
 std::list<Method> xposedOriginalMethods;
 
 
@@ -85,11 +92,39 @@ bool xposedOnVmCreated(JNIEnv* env, const char* loadedClassName) {
     
     LOGI("Found Xposed class '%s', now initializing\n", XPOSED_CLASS);
     register_de_robv_android_xposed_XposedBridge(env);
+    register_android_content_res_XResources(env);
     
     xposedHandleHookedMethod = env->GetStaticMethodID(xposedClass, "handleHookedMethod",
         "(Ljava/lang/reflect/Method;Ljava/lang/Object;[Ljava/lang/Object;)Ljava/lang/Object;");
     if (xposedHandleHookedMethod == NULL) {
         LOGE("ERROR: could not find method %s.handleHookedMethod(Method, Object, Object[])\n", XPOSED_CLASS);
+        dvmLogExceptionStackTrace();
+        env->ExceptionClear();
+        return false;
+    }
+    
+    xresourcesClass = env->FindClass(XRESOURCES_CLASS);
+    xresourcesClass = reinterpret_cast<jclass>(env->NewGlobalRef(xresourcesClass));
+    if (xresourcesClass == NULL) {
+        LOGE("Error while loading XResources class '%s':\n", XRESOURCES_CLASS);
+        dvmLogExceptionStackTrace();
+        env->ExceptionClear();
+        return false;
+    }
+    
+    xresourcesTranslateResId = env->GetStaticMethodID(xresourcesClass, "translateResId",
+        "(ILandroid/content/res/XResources;Landroid/content/res/Resources;)I");
+    if (xresourcesTranslateResId == NULL) {
+        LOGE("ERROR: could not find method %s.translateResId(int, Resources, Resources)\n", XRESOURCES_CLASS);
+        dvmLogExceptionStackTrace();
+        env->ExceptionClear();
+        return false;
+    }
+    
+    xresourcesTranslateAttrId = env->GetStaticMethodID(xresourcesClass, "translateAttrId",
+        "(Ljava/lang/String;Landroid/content/res/XResources;)I");
+    if (xresourcesTranslateAttrId == NULL) {
+        LOGE("ERROR: could not find method %s.findAttrId(String, Resources, Resources)\n", XRESOURCES_CLASS);
         dvmLogExceptionStackTrace();
         env->ExceptionClear();
         return false;
@@ -353,20 +388,92 @@ static jobject de_robv_android_xposed_XposedBridge_invokeOriginalMethodNative(JN
     return xposedAddLocalReference(self, result);
 }
 
-static void de_robv_android_xposed_XposedBridge_setClassModifiersNative(JNIEnv* env, jclass clazz, jobject reflectClass, jint modifiers) {
-    ClassObject* classObj = (ClassObject*) dvmDecodeIndirectRef(dvmThreadSelf(), reflectClass);
-    LOGE("description %s", classObj->descriptor);
-    classObj->accessFlags |= ACC_PUBLIC;
+static void android_content_res_XResources_rewriteXmlReferencesNative(JNIEnv* env, jclass clazz,
+            jint parserPtr, jobject origRes, jobject repRes) {
+
+    ::Thread* self = dvmThreadSelf();
+    ThreadStatus oldThreadStatus = self->status;
+    
+    ResXMLParser* parser = (ResXMLParser*)parserPtr;
+    const ResXMLTree& mTree = parser->mTree;
+    uint32_t* mResIds = (uint32_t*)mTree.mResIds;
+    ResXMLTree_attrExt* tag;
+    int attrCount;
+    
+    if (parser == NULL)
+        return;
+    
+    do {
+        switch (parser->next()) {
+            case ResXMLParser::START_TAG:
+                tag = (ResXMLTree_attrExt*)parser->mCurExt;
+                attrCount = dtohs(tag->attributeCount);
+                for (int idx = 0; idx < attrCount; idx++) {
+                    ResXMLTree_attribute* attr = (ResXMLTree_attribute*)
+                        (((const uint8_t*)tag)
+                         + dtohs(tag->attributeStart)
+                         + (dtohs(tag->attributeSize)*idx));
+                         
+                    // find resource IDs for attribute names
+                    int32_t attrNameID = parser->getAttributeNameID(idx);
+                    // only replace attribute name IDs for app packages
+                    if (attrNameID >= 0 && (size_t)attrNameID < mTree.mNumResIds && dtohl(mResIds[attrNameID]) >= 0x7f000000) {
+                        size_t attNameLen;
+                        const char16_t* attrName = mTree.mStrings.stringAt(attrNameID, &attNameLen);
+                        jint attrResID = env->CallStaticIntMethod(xresourcesClass, xresourcesTranslateAttrId,
+                            env->NewString((const jchar*)attrName, attNameLen), origRes);
+                        if (env->ExceptionCheck())
+                            goto leave;
+                            
+                        mResIds[attrNameID] = htodl(attrResID);
+                    }
+                    
+                    // find original resource IDs for reference values (app packages only)
+                    if (attr->typedValue.dataType != Res_value::TYPE_REFERENCE)
+                        continue;
+
+                    jint oldValue = dtohl(attr->typedValue.data);
+                    if (oldValue < 0x7f000000)
+                        continue;
+                    
+                    jint newValue = env->CallStaticIntMethod(xresourcesClass, xresourcesTranslateResId,
+                        oldValue, origRes, repRes);
+                    if (env->ExceptionCheck())
+                        goto leave;
+
+                    if (newValue != oldValue)
+                        attr->typedValue.data = htodl(newValue);
+                }
+                continue;
+            case ResXMLParser::END_DOCUMENT:
+            case ResXMLParser::BAD_DOCUMENT:
+                goto leave;
+            default:
+                continue;
+        }
+    } while (true);
+    
+    leave:
+    parser->restart();
+    dvmChangeStatus(self, oldThreadStatus);
 }
+
 
 static const JNINativeMethod xposedMethods[] = {
     {"hookMethodNative", "(Ljava/lang/reflect/Method;)V", (void*)de_robv_android_xposed_XposedBridge_hookMethodNative},
     {"invokeOriginalMethodNative", "(Ljava/lang/reflect/Method;[Ljava/lang/Class;Ljava/lang/Class;Ljava/lang/Object;[Ljava/lang/Object;)Ljava/lang/Object;", (void*)de_robv_android_xposed_XposedBridge_invokeOriginalMethodNative},
-    {"setClassModifiersNative", "(Ljava/lang/Class;I)V", (void*)de_robv_android_xposed_XposedBridge_setClassModifiersNative},
+};
+
+static const JNINativeMethod xresourcesMethods[] = {
+    {"rewriteXmlReferencesNative", "(ILandroid/content/res/XResources;Landroid/content/res/Resources;)V", (void*)android_content_res_XResources_rewriteXmlReferencesNative},
 };
 
 static int register_de_robv_android_xposed_XposedBridge(JNIEnv* env) {
     return AndroidRuntime::registerNativeMethods(env, XPOSED_CLASS, xposedMethods, NELEM(xposedMethods));
+}
+
+static int register_android_content_res_XResources(JNIEnv* env) {
+    return AndroidRuntime::registerNativeMethods(env, XRESOURCES_CLASS, xresourcesMethods, NELEM(xresourcesMethods));
 }
 
 }
