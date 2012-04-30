@@ -2,6 +2,8 @@
  * Xposed enables "god mode" for developers
  */
 
+#define LOG_TAG "Xposed"
+
 #include "xposed.h"
 
 #include <utils/Log.h>
@@ -31,25 +33,30 @@ jclass xresourcesClass = NULL;
 jmethodID xresourcesTranslateResId = NULL;
 jmethodID xresourcesTranslateAttrId = NULL;
 std::list<Method> xposedOriginalMethods;
+const char* startClassName = NULL;
 
 
 ////////////////////////////////////////////////////////////
 // called directoy by app_process
 ////////////////////////////////////////////////////////////
 
-void addXposedToClasspath(bool zygote) {
+bool isXposedDisabled() {
     // is the blocker file present?
     if (access(XPOSED_LOAD_BLOCKER, F_OK) == 0) {
         LOGE("found %s, not loading Xposed\n", XPOSED_LOAD_BLOCKER);
-        return;
+        return true;
     }
+    return false;
+}
 
+bool addXposedToClasspath(bool zygote) {
+    LOGI("-----------------\n");
     // do we have a new version and are (re)starting zygote? Then load it!
     if (zygote && access(XPOSED_JAR_NEWVERSION, R_OK) == 0) {
         LOGI("Found new Xposed jar version, activating it\n");
         if (rename(XPOSED_JAR_NEWVERSION, XPOSED_JAR) != 0) {
             LOGE("could not move %s to %s\n", XPOSED_JAR_NEWVERSION, XPOSED_JAR);
-            return;
+            return false;
         }
     }
     if (access(XPOSED_JAR, R_OK) == 0) {
@@ -61,17 +68,20 @@ void addXposedToClasspath(bool zygote) {
             sprintf(classPath, "%s:%s", XPOSED_JAR, oldClassPath);
             setenv("CLASSPATH", classPath, 1);
         }
-        keepLoadingXposed = true;
         LOGI("Added Xposed (%s) to CLASSPATH.\n", XPOSED_JAR);
+        return true;
     } else {
         LOGE("ERROR: could not access Xposed jar '%s'\n", XPOSED_JAR);
+        return false;
     }
 }
 
 
-bool xposedOnVmCreated(JNIEnv* env, const char* loadedClassName) {
+bool xposedOnVmCreated(JNIEnv* env, const char* className) {
     if (!keepLoadingXposed)
         return false;
+        
+    startClassName = className;
         
     // disable some access checks
     char asmReturnTrue[] = { 0x01, 0x20, 0x70, 0x47 };
@@ -130,24 +140,7 @@ bool xposedOnVmCreated(JNIEnv* env, const char* loadedClassName) {
         return false;
     }
     
-    LOGI("Calling onVmCreated in XposedBridge\n");            
-    Method* methodId = (Method*)env->GetStaticMethodID(xposedClass, "onVmCreated", "(Ljava/lang/String;)Z");
-    if (methodId == NULL) {
-        LOGE("ERROR: could not find method %s.onVmCreated(String)\n", XPOSED_CLASS);
-        dvmLogExceptionStackTrace();
-        env->ExceptionClear();
-        return false;
-    }
-    
-    jboolean result = env->CallStaticBooleanMethod(xposedClass, (jmethodID)methodId, env->NewStringUTF(loadedClassName));
-    if (env->ExceptionCheck()) {
-        LOGE("ERROR: uncaught exception in method %s.onVmCreated(String):\n", XPOSED_CLASS);
-        dvmLogExceptionStackTrace();
-        env->ExceptionClear();
-        return false;
-    }
-
-    return result;
+    return true;
 }
 
 void xposedCallStaticVoidMethod(JNIEnv* env, const char* methodName) {
@@ -458,10 +451,15 @@ static void android_content_res_XResources_rewriteXmlReferencesNative(JNIEnv* en
     dvmChangeStatus(self, oldThreadStatus);
 }
 
+static jobject de_robv_android_xposed_XposedBridge_getStartClassName(JNIEnv* env, jclass clazz) {
+    return env->NewStringUTF(startClassName);
+}
+
 
 static const JNINativeMethod xposedMethods[] = {
     {"hookMethodNative", "(Ljava/lang/reflect/Member;)V", (void*)de_robv_android_xposed_XposedBridge_hookMethodNative},
     {"invokeOriginalMethodNative", "(Ljava/lang/reflect/Member;[Ljava/lang/Class;Ljava/lang/Class;Ljava/lang/Object;[Ljava/lang/Object;)Ljava/lang/Object;", (void*)de_robv_android_xposed_XposedBridge_invokeOriginalMethodNative},
+    {"getStartClassName", "()Ljava/lang/String;", (void*)de_robv_android_xposed_XposedBridge_getStartClassName},
 };
 
 static const JNINativeMethod xresourcesMethods[] = {

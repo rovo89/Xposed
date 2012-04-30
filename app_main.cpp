@@ -88,13 +88,9 @@ public:
         sp<ProcessState> proc = ProcessState::self();
         LOGV("App process: starting thread pool.\n");
         proc->startThreadPool();
-        
-        xposedCallStaticVoidMethod(getJNIEnv(), "onStartedBeforeMain");
 
         AndroidRuntime* ar = AndroidRuntime::getRuntime();
         ar->callMain(mClassName, mClass, mArgC, mArgV);
-        
-        xposedCallStaticVoidMethod(getJNIEnv(), "onStartedAfterMain");
 
         IPCThreadState::self()->stopProcess();
     }
@@ -110,8 +106,6 @@ public:
 
     virtual void onExit(int code)
     {
-        xposedCallStaticVoidMethod(getJNIEnv(), "onExit");
-    
         if (mClassName == NULL) {
             // if zygote
             IPCThreadState::self()->stopProcess();
@@ -197,17 +191,17 @@ int main(int argc, const char* const argv[])
 
     runtime.mParentDir = parentDir;
     
-    addXposedToClasspath(zygote);
+    keepLoadingXposed = !isXposedDisabled() && addXposedToClasspath(zygote);
 
     if (zygote) {
-        runtime.start("com.android.internal.os.ZygoteInit",
+        runtime.start(keepLoadingXposed ? XPOSED_CLASS_DOTS : "com.android.internal.os.ZygoteInit",
                 startSystemServer ? "start-system-server" : "");
     } else if (className) {
         // Remainder of args get passed to startup class main()
         runtime.mClassName = className;
         runtime.mArgC = argc - i;
         runtime.mArgV = argv + i;
-        runtime.start("com.android.internal.os.RuntimeInit",
+        runtime.start(keepLoadingXposed ? XPOSED_CLASS_DOTS : "com.android.internal.os.RuntimeInit",
                 application ? "application" : "tool");
     } else {
         fprintf(stderr, "Error: no class name or --zygote supplied.\n");
@@ -216,4 +210,3 @@ int main(int argc, const char* const argv[])
         return 10;
     }
 }
-
