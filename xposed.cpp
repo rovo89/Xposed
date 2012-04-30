@@ -95,7 +95,7 @@ bool xposedOnVmCreated(JNIEnv* env, const char* loadedClassName) {
     register_android_content_res_XResources(env);
     
     xposedHandleHookedMethod = env->GetStaticMethodID(xposedClass, "handleHookedMethod",
-        "(Ljava/lang/reflect/Method;Ljava/lang/Object;[Ljava/lang/Object;)Ljava/lang/Object;");
+        "(Ljava/lang/reflect/Member;Ljava/lang/Object;[Ljava/lang/Object;)Ljava/lang/Object;");
     if (xposedHandleHookedMethod == NULL) {
         LOGE("ERROR: could not find method %s.handleHookedMethod(Method, Object, Object[])\n", XPOSED_CLASS);
         dvmLogExceptionStackTrace();
@@ -460,8 +460,8 @@ static void android_content_res_XResources_rewriteXmlReferencesNative(JNIEnv* en
 
 
 static const JNINativeMethod xposedMethods[] = {
-    {"hookMethodNative", "(Ljava/lang/reflect/Method;)V", (void*)de_robv_android_xposed_XposedBridge_hookMethodNative},
-    {"invokeOriginalMethodNative", "(Ljava/lang/reflect/Method;[Ljava/lang/Class;Ljava/lang/Class;Ljava/lang/Object;[Ljava/lang/Object;)Ljava/lang/Object;", (void*)de_robv_android_xposed_XposedBridge_invokeOriginalMethodNative},
+    {"hookMethodNative", "(Ljava/lang/reflect/Member;)V", (void*)de_robv_android_xposed_XposedBridge_hookMethodNative},
+    {"invokeOriginalMethodNative", "(Ljava/lang/reflect/Member;[Ljava/lang/Class;Ljava/lang/Class;Ljava/lang/Object;[Ljava/lang/Object;)Ljava/lang/Object;", (void*)de_robv_android_xposed_XposedBridge_invokeOriginalMethodNative},
 };
 
 static const JNINativeMethod xresourcesMethods[] = {
