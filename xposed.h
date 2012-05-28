@@ -13,7 +13,7 @@ namespace android {
 #define XPOSED_CLASS "de/robv/android/xposed/XposedBridge"
 #define XPOSED_CLASS_DOTS "de.robv.android.xposed.XposedBridge"
 #define XRESOURCES_CLASS "android/content/res/XResources"
-#define XPOSED_VERSION "1.6"
+#define XPOSED_VERSION "1.7b2"
 
 extern bool keepLoadingXposed;
 typedef std::list<Method>::iterator XposedOriginalMethodsIt;
@@ -36,6 +36,7 @@ static jobject de_robv_android_xposed_XposedBridge_invokeOriginalMethodNative(JN
             jobjectArray params1, jclass returnType1, jobject thisObject1, jobjectArray args1);
 static void android_content_res_XResources_rewriteXmlReferencesNative(JNIEnv* env, jclass clazz,
             jint parserPtr, jobject origRes, jobject repRes);
+static jboolean de_robv_android_xposed_XposedBridge_patchNativeLibrary(JNIEnv* env, jclass clazz, jstring library, jbyteArray patch, jint pid, jlong libBase, jlong libSize);
 static int register_de_robv_android_xposed_XposedBridge(JNIEnv* env);
 static int register_android_content_res_XResources(JNIEnv* env);
 }

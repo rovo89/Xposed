@@ -14,8 +14,12 @@
 #undef private
 
 #include <stdio.h>
+#include <fcntl.h>
 #include <sys/stat.h>
 #include <sys/mman.h>
+#include <bzlib.h>
+#include <sys/ptrace.h>
+#include <sys/wait.h>
 
 #ifdef WITH_JIT
 #include <interp/Jit.h>
@@ -147,7 +151,7 @@ void xposedCallStaticVoidMethod(JNIEnv* env, const char* methodName) {
     if (!keepLoadingXposed)
         return;
     
-    LOGI("Calling %s in XposedBridge\n", methodName);            
+    //LOGI("Calling %s in XposedBridge\n", methodName);            
     Method* methodId = (Method*)env->GetStaticMethodID(xposedClass, methodName, "()V");
     if (methodId == NULL) {
         LOGE("ERROR: could not find method %s.%s()\n", XPOSED_CLASS, methodName);
@@ -325,6 +329,28 @@ static void replaceAsm(void* function, char* newCode, int len) {
 // JNI methods
 ////////////////////////////////////////////////////////////
 
+Method* getMethodFromReflectObjWithoutClassInit(jobject jmethod)
+{
+    Object* obj = dvmDecodeIndirectRef(dvmThreadSelf(), jmethod);
+    ClassObject* clazz;
+    int slot;
+
+    if (obj->clazz == gDvm.classJavaLangReflectConstructor) {
+        clazz = (ClassObject*)dvmGetFieldObject(obj,
+                                gDvm.offJavaLangReflectConstructor_declClass);
+        slot = dvmGetFieldInt(obj, gDvm.offJavaLangReflectConstructor_slot);
+    } else if (obj->clazz == gDvm.classJavaLangReflectMethod) {
+        clazz = (ClassObject*)dvmGetFieldObject(obj,
+                                gDvm.offJavaLangReflectMethod_declClass);
+        slot = dvmGetFieldInt(obj, gDvm.offJavaLangReflectMethod_slot);
+    } else {
+        assert(false);
+        return NULL;
+    }
+
+    return dvmSlotToMethod(clazz, slot);
+}
+
 static void de_robv_android_xposed_XposedBridge_hookMethodNative(JNIEnv* env, jclass clazz, jobject reflectedMethod) {
     // Usage errors?
     if (reflectedMethod == NULL) {
@@ -333,7 +359,7 @@ static void de_robv_android_xposed_XposedBridge_hookMethodNative(JNIEnv* env, jc
     }
     
     // Find the internal representation of the method
-    Method* method = (Method*)env->FromReflectedMethod(reflectedMethod);
+    Method* method = getMethodFromReflectObjWithoutClassInit(reflectedMethod);
     if (method == NULL) {
         dvmThrowNoSuchMethodError("could not get internal representation for method");
         return;
@@ -455,11 +481,258 @@ static jobject de_robv_android_xposed_XposedBridge_getStartClassName(JNIEnv* env
     return env->NewStringUTF(startClassName);
 }
 
+int memcpyToProcess(pid_t pid, void* dest, const void* src, size_t n) {
+    long *d = (long*) dest;
+    long *s = (long*) src;
+    
+	if (ptrace(PTRACE_ATTACH, pid, NULL, NULL) == -1) {
+	    LOGE("could not attach to process %d: %s", pid, strerror(errno));
+	    return 1;
+    }
+	   
+	waitpid(pid, 0, 0);
+
+    for (uint i = 0; i < n / sizeof(long); i++) {
+        if (ptrace(PTRACE_POKETEXT, pid, d+i, (void*)s[i]) == -1) {
+	        LOGE("could not write memory to process %d (%p): %s", pid, d+i, strerror(errno));
+	        return 1;
+        }
+    }
+
+	if (ptrace(PTRACE_DETACH, pid, NULL, NULL) == -1) {
+	    LOGE("could not detach from process %d: %s", pid, strerror(errno));
+	    return 1;
+    }
+    
+    return 0;
+}
+
+// code copied from bspatch (http://www.daemonology.net/bsdiff/) and adjusted for in-memory replacement
+static off_t offtin(u_char *buf)
+{
+	off_t y;
+
+	y=buf[7]&0x7F;
+	y=y*256;y+=buf[6];
+	y=y*256;y+=buf[5];
+	y=y*256;y+=buf[4];
+	y=y*256;y+=buf[3];
+	y=y*256;y+=buf[2];
+	y=y*256;y+=buf[1];
+	y=y*256;y+=buf[0];
+
+	if(buf[7]&0x80) y=-y;
+
+	return y;
+}
+
+/* main changes:
+    - patched code is written to memory instead of file
+    - patching memory of other processes is supported
+    - only the first x bytes are patched, were x=min(size in patch header,original size,libsize from memory map)
+    - it is no error when the target size is larger than x, patching simply stops after x bytes
+*/
+int patchNativeLibrary(const char* libname, const char* patchfile, pid_t pid, u_char* libbase, ssize_t libsize)
+{
+	FILE * f, * cpf, * dpf, * epf;
+	BZFILE * cpfbz2, * dpfbz2, * epfbz2;
+	int cbz2err, dbz2err, ebz2err;
+	int fd;
+	ssize_t oldsize,newsize,orig_newsize;
+	ssize_t bzctrllen,bzdatalen;
+	u_char header[32],buf[8];
+	u_char *old, *newbytes;
+	off_t oldpos,newpos;
+	off_t ctrl[3];
+	off_t lenread;
+	off_t i;
+
+	/* Open patch file */
+	if ((f = fopen(patchfile, "r")) == NULL)
+		return 1;
+
+	/*
+	File format:
+		0	8	"BSDIFF40"
+		8	8	X
+		16	8	Y
+		24	8	sizeof(newfile)
+		32	X	bzip2(control block)
+		32+X	Y	bzip2(diff block)
+		32+X+Y	???	bzip2(extra block)
+	with control block a set of triples (x,y,z) meaning "add x bytes
+	from oldfile to x bytes from the diff block; copy y bytes from the
+	extra block; seek forwards in oldfile by z bytes".
+	*/
+
+	/* Read header */
+	if (fread(header, 1, 32, f) < 32)
+		return 1;
+
+	/* Check for appropriate magic */
+	if (memcmp(header, "BSDIFF40", 8) != 0)
+		return 1;
+
+	/* Read lengths from header */
+	bzctrllen=offtin(header+8);
+	bzdatalen=offtin(header+16);
+	newsize=orig_newsize=offtin(header+24);
+	if((bzctrllen<0) || (bzdatalen<0) || (newsize<0))
+		return 1;
+
+	/* Close patch file and re-open it via libbzip2 at the right places */
+	if ((fclose(f))
+	
+	|| ((cpf = fopen(patchfile, "r")) == NULL)
+	|| (fseeko(cpf, 32, SEEK_SET))
+	|| ((cpfbz2 = BZ2_bzReadOpen(&cbz2err, cpf, 0, 0, NULL, 0)) == NULL)
+	
+	|| ((dpf = fopen(patchfile, "r")) == NULL)
+	|| (fseeko(dpf, 32 + bzctrllen, SEEK_SET))
+	|| ((dpfbz2 = BZ2_bzReadOpen(&dbz2err, dpf, 0, 0, NULL, 0)) == NULL)
+	
+	|| ((epf = fopen(patchfile, "r")) == NULL)
+	|| (fseeko(epf, 32 + bzctrllen + bzdatalen, SEEK_SET))
+	|| ((epfbz2 = BZ2_bzReadOpen(&ebz2err, epf, 0, 0, NULL, 0)) == NULL))
+    	return 1;
+
+	
+	if(((fd=open(libname,O_RDONLY,0))<0) ||
+		((oldsize=lseek(fd,0,SEEK_END))==-1) ||
+		((old=(u_char*)malloc(oldsize+1))==NULL) ||
+		(lseek(fd,0,SEEK_SET)!=0) ||
+		(read(fd,old,oldsize)!=oldsize) ||
+		(close(fd)==-1))
+		return 1;
+		
+	if (newsize > libsize)
+	    newsize = libsize;
+	if (newsize > oldsize)
+	    newsize = oldsize;
+    
+    if ((newbytes=(u_char*)malloc(newsize+1))==NULL)
+	    return 1;
+	
+	memcpy(newbytes, old, newsize);
+
+	oldpos=0;newpos=0;
+	while(newpos<newsize) {
+		/* Read control data */
+		for(i=0;i<=2;i++) {
+			lenread = BZ2_bzRead(&cbz2err, cpfbz2, buf, 8);
+			if ((lenread < 8) || ((cbz2err != BZ_OK) &&
+			    (cbz2err != BZ_STREAM_END)))
+				return 1;
+			ctrl[i]=offtin(buf);
+		};
+		
+		/* Sanity-check */
+		if(newpos+ctrl[0]>newsize)
+			ctrl[0] = newsize - newpos;
+
+		/* Read diff string */
+		lenread = BZ2_bzRead(&dbz2err, dpfbz2, newbytes+ newpos, ctrl[0]);
+		if ((lenread < ctrl[0]) ||
+		    ((dbz2err != BZ_OK) && (dbz2err != BZ_STREAM_END)))
+			return 1;
+
+		/* Add old data to diff string */
+		for(i=0;i<ctrl[0];i++)
+			if((oldpos+i>=0) && (oldpos+i<oldsize))
+				newbytes[newpos+i]+=old[oldpos+i];
+
+		/* Adjust pointers */
+		newpos+=ctrl[0];
+		oldpos+=ctrl[0];
+
+		/* Sanity-check */
+		if(newpos+ctrl[1]>newsize)
+			ctrl[1] = newsize - newpos;
+
+		/* Read extra string */
+		lenread = BZ2_bzRead(&ebz2err, epfbz2, newbytes + newpos, ctrl[1]);
+		if ((lenread < ctrl[1]) ||
+		    ((ebz2err != BZ_OK) && (ebz2err != BZ_STREAM_END)))
+			return 1;
+
+		/* Adjust pointers */
+		newpos+=ctrl[1];
+		oldpos+=ctrl[2];
+	};
+
+	/* Clean up the bzip2 reads */
+	BZ2_bzReadClose(&cbz2err, cpfbz2);
+	BZ2_bzReadClose(&dbz2err, dpfbz2);
+	BZ2_bzReadClose(&ebz2err, epfbz2);
+	if (fclose(cpf) || fclose(dpf) || fclose(epf))
+	    return 1;
+
+	/* Write patched memory content */
+	if (pid == 0) {
+        void* pageStart = (void*)((int)libbase & ~(PAGESIZE-1));
+        mprotect(pageStart, newsize, PROT_READ | PROT_WRITE | PROT_EXEC);
+        memcpy(libbase, newbytes, newsize);
+    } else {
+        if (memcpyToProcess(pid, libbase, newbytes, newsize))
+            return 1;
+    }
+    
+	free(newbytes);
+    
+	return 0;
+}
+// end of bspatch code
+
+static jboolean de_robv_android_xposed_XposedBridge_patchNativeLibrary(JNIEnv* env, jclass clazz, jstring library, jbyteArray patch, jint pid, jlong libBase, jlong libSize) {
+    ::Thread* self = dvmThreadSelf();
+    ThreadStatus oldThreadStatus = self->status;
+
+    int returncode = 0;
+    jbyte* patchBytes;
+    ssize_t written;
+    char tmpPath[256];
+    const char* libraryPath;
+    FILE* tmpFile = NULL;
+    
+    ssize_t size = env->GetArrayLength(patch);
+    if (size == 0)
+        goto leave;
+        
+    // write byte array to temporary file
+    strcpy(tmpPath, "/data/xposed/tmp/xposed.libpatch.XXXXXX");
+    tmpFile = fdopen(mkstemp(tmpPath), "w");
+    if (tmpFile == NULL) {
+        LOGE("Could not create a temporary file %s", tmpPath);
+        goto leave;
+    }
+
+    patchBytes = env->GetByteArrayElements(patch, NULL);
+    written = fwrite(patchBytes, 1, size, tmpFile);
+    if (written != size) {
+        LOGE("Could only write %d of %d bytes to %s in patchNativeLibrary", (int)written, (int)size, tmpPath);
+        fclose(tmpFile);
+        goto leave;
+    }
+    fclose(tmpFile);
+    
+    env->ReleaseByteArrayElements(patch, patchBytes, 0);
+    libraryPath = env->GetStringUTFChars(library, NULL);
+    returncode = patchNativeLibrary(libraryPath, tmpPath, pid, (u_char*)libBase, (ssize_t)libSize);
+    env->ReleaseStringUTFChars(library, libraryPath);
+
+leave:
+    unlink(tmpPath);
+    
+    dvmChangeStatus(self, oldThreadStatus);
+    return returncode == 0;
+}
+
 
 static const JNINativeMethod xposedMethods[] = {
     {"hookMethodNative", "(Ljava/lang/reflect/Member;)V", (void*)de_robv_android_xposed_XposedBridge_hookMethodNative},
     {"invokeOriginalMethodNative", "(Ljava/lang/reflect/Member;[Ljava/lang/Class;Ljava/lang/Class;Ljava/lang/Object;[Ljava/lang/Object;)Ljava/lang/Object;", (void*)de_robv_android_xposed_XposedBridge_invokeOriginalMethodNative},
     {"getStartClassName", "()Ljava/lang/String;", (void*)de_robv_android_xposed_XposedBridge_getStartClassName},
+    {"patchNativeLibrary", "(Ljava/lang/String;[BIJJ)Z", (void*)de_robv_android_xposed_XposedBridge_patchNativeLibrary},
 };
 
 static const JNINativeMethod xresourcesMethods[] = {

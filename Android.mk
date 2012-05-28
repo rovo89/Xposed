@@ -13,10 +13,13 @@ LOCAL_SHARED_LIBRARIES := \
 	libdvm \
 	libstlport
 
+LOCAL_STATIC_LIBRARIES += libbz
+
 LOCAL_C_INCLUDES += dalvik \
                     dalvik/vm \
                     external/stlport/stlport \
-                    bionic/ \
+                    external/bzip2 \
+                    bionic \
                     bionic/libstdc++/include
 
 LOCAL_MODULE:= xposed
