@@ -20,6 +20,8 @@
 #include <bzlib.h>
 #include <sys/ptrace.h>
 #include <sys/wait.h>
+#include <cutils/properties.h>
+#include <sys/mount.h>
 
 #ifdef WITH_JIT
 #include <interp/Jit.h>
@@ -51,6 +53,42 @@ bool isXposedDisabled() {
         return true;
     }
     return false;
+}
+
+bool maybeReplaceLibs(bool zygote) {
+    if (!zygote)
+        return true;
+    
+    char value[PROPERTY_VALUE_MAX];
+    struct stat sb;
+    
+    property_get("xposed.libs.replaced", value, "0");
+    if (value[0] == '0') {      
+        property_set("xposed.libs.replaced", "1");
+    
+        // only continue if the lib dir exists
+        if (stat(XPOSED_LIBS, &sb) != 0 || !S_ISDIR(sb.st_mode))
+            return true;
+        
+        LOGI("Copying native libraries into /vendor/lib");
+        
+        // try remounting the file system root r/w
+        int ret = mount("rootfs", "/", "rootfs", MS_REMOUNT, NULL);
+        if (ret != 0) {
+            LOGE("Could not mount \"/\" r/w, error %d", ret);
+            return true;
+        }
+        
+        // copy libs
+        mkdir("/vendor/lib/", 0755);
+        system("cp -a " XPOSED_LIBS "* /vendor/lib/");
+
+        // restart zygote
+        property_set("ctl.restart", "surfaceflinger");
+        property_set("ctl.restart", "zygote");
+        exit(0);
+    }
+    return true;
 }
 
 bool addXposedToClasspath(bool zygote) {
@@ -607,8 +645,6 @@ int patchNativeLibrary(const char* libname, const char* patchfile, pid_t pid, u_
 		
 	if (newsize > libsize)
 	    newsize = libsize;
-	if (newsize > oldsize)
-	    newsize = oldsize;
     
     if ((newbytes=(u_char*)malloc(newsize+1))==NULL)
 	    return 1;

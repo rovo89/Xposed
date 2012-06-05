@@ -10,6 +10,7 @@ namespace android {
 #define XPOSED_JAR "/data/xposed/XposedBridge.jar"
 #define XPOSED_JAR_NEWVERSION XPOSED_JAR ".newversion"
 #define XPOSED_LOAD_BLOCKER "/data/xposed/disabled"
+#define XPOSED_LIBS "/data/xposed/lib/"
 #define XPOSED_CLASS "de/robv/android/xposed/XposedBridge"
 #define XPOSED_CLASS_DOTS "de.robv.android.xposed.XposedBridge"
 #define XRESOURCES_CLASS "android/content/res/XResources"
@@ -21,6 +22,7 @@ typedef std::list<Method>::iterator XposedOriginalMethodsIt;
 // called directoy by app_process
 bool isXposedDisabled();
 bool addXposedToClasspath(bool zygote);
+bool maybeReplaceLibs(bool zygote);
 bool xposedOnVmCreated(JNIEnv* env, const char* className);
 void xposedCallStaticVoidMethod(JNIEnv* env, const char* methodName);
 
