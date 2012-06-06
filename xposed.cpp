@@ -189,12 +189,15 @@ void xposedCallStaticVoidMethod(JNIEnv* env, const char* methodName) {
     if (!keepLoadingXposed)
         return;
     
+    ::Thread* self = dvmThreadSelf();
+    ThreadStatus oldThreadStatus = self->status;
     //LOGI("Calling %s in XposedBridge\n", methodName);            
     Method* methodId = (Method*)env->GetStaticMethodID(xposedClass, methodName, "()V");
     if (methodId == NULL) {
         LOGE("ERROR: could not find method %s.%s()\n", XPOSED_CLASS, methodName);
         dvmLogExceptionStackTrace();
         env->ExceptionClear();
+        dvmChangeStatus(self, oldThreadStatus);
         return;
     }
     
@@ -203,8 +206,10 @@ void xposedCallStaticVoidMethod(JNIEnv* env, const char* methodName) {
         LOGE("ERROR: uncaught exception in method %s.%s():\n", XPOSED_CLASS, methodName);
         dvmLogExceptionStackTrace();
         env->ExceptionClear();
+        dvmChangeStatus(self, oldThreadStatus);
         return;
     }
+    dvmChangeStatus(self, oldThreadStatus);
 }
 
 
@@ -232,7 +237,6 @@ static void xposedCallHandler(const u4* args, JValue* pResult, const Method* met
     // convert/box arguments
     const char* desc = &method->shorty[1]; // [0] is the return type.
     Object* thisObject = NULL;
-    u2 numArgs = method->insSize;
     size_t srcIndex = 0;
     size_t dstIndex = 0;
     
@@ -240,11 +244,10 @@ static void xposedCallHandler(const u4* args, JValue* pResult, const Method* met
     if (!dvmIsStaticMethod(&(*original))) {
         thisObject = (Object*) xposedAddLocalReference(self, (Object*)args[0]);
         srcIndex++;
-        numArgs--;
     }
     
     jclass objectClass = env->FindClass("java/lang/Object");
-    jobjectArray argsArray = env->NewObjectArray(numArgs, objectClass, NULL);
+    jobjectArray argsArray = env->NewObjectArray(dvmComputeMethodArgsSize(method), objectClass, NULL);
     
     while (*desc != '\0') {
         char descChar = *(desc++);
@@ -441,16 +444,16 @@ static jobject de_robv_android_xposed_XposedBridge_invokeOriginalMethodNative(JN
     ClassObject* returnType = (ClassObject*)dvmDecodeIndirectRef(self, returnType1);
     
     // invoke the method
+    dvmChangeStatus(self, THREAD_RUNNING);
     Object* result = dvmInvokeMethod(thisObject, method, args, params, returnType, true);
+    dvmChangeStatus(self, THREAD_NATIVE);
+    
     return xposedAddLocalReference(self, result);
 }
 
 static void android_content_res_XResources_rewriteXmlReferencesNative(JNIEnv* env, jclass clazz,
             jint parserPtr, jobject origRes, jobject repRes) {
 
-    ::Thread* self = dvmThreadSelf();
-    ThreadStatus oldThreadStatus = self->status;
-    
     ResXMLParser* parser = (ResXMLParser*)parserPtr;
     const ResXMLTree& mTree = parser->mTree;
     uint32_t* mResIds = (uint32_t*)mTree.mResIds;
@@ -512,7 +515,6 @@ static void android_content_res_XResources_rewriteXmlReferencesNative(JNIEnv* en
     
     leave:
     parser->restart();
-    dvmChangeStatus(self, oldThreadStatus);
 }
 
 static jobject de_robv_android_xposed_XposedBridge_getStartClassName(JNIEnv* env, jclass clazz) {
@@ -720,9 +722,6 @@ int patchNativeLibrary(const char* libname, const char* patchfile, pid_t pid, u_
 // end of bspatch code
 
 static jboolean de_robv_android_xposed_XposedBridge_patchNativeLibrary(JNIEnv* env, jclass clazz, jstring library, jbyteArray patch, jint pid, jlong libBase, jlong libSize) {
-    ::Thread* self = dvmThreadSelf();
-    ThreadStatus oldThreadStatus = self->status;
-
     int returncode = 0;
     jbyte* patchBytes;
     ssize_t written;
@@ -758,8 +757,6 @@ static jboolean de_robv_android_xposed_XposedBridge_patchNativeLibrary(JNIEnv* e
 
 leave:
     unlink(tmpPath);
-    
-    dvmChangeStatus(self, oldThreadStatus);
     return returncode == 0;
 }
 
