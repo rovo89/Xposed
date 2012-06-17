@@ -362,6 +362,7 @@ static void replaceAsm(void* function, char* newCode, int len) {
     mprotect(pageStart, PAGESIZE, PROT_READ | PROT_WRITE | PROT_EXEC);
     memcpy(function, newCode, len);
     mprotect(pageStart, PAGESIZE, PROT_READ | PROT_EXEC);
+    __clear_cache(function, (char*)function+len);
 }
 
 

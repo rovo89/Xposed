@@ -1,7 +1,7 @@
 LOCAL_PATH:= $(call my-dir)
 include $(CLEAR_VARS)
 
-LOCAL_SRC_FILES:= \
+LOCAL_SRC_FILES := \
 	app_main.cpp \
 	xposed.cpp
 
@@ -22,9 +22,18 @@ LOCAL_C_INCLUDES += dalvik \
                     bionic \
                     bionic/libstdc++/include
 
-LOCAL_MODULE:= xposed
+LOCAL_MODULE := xposed
 LOCAL_MODULE_TAGS := optional
 
 LOCAL_CFLAGS += -DWITH_JIT
 
 include $(BUILD_EXECUTABLE)
+
+### binary compatibility test executable
+include $(CLEAR_VARS)
+LOCAL_SRC_FILES := xposedtest.cpp
+LOCAL_MODULE := xposedtest
+LOCAL_MODULE_TAGS := optional
+LOCAL_CFLAGS += -O0 # no optimizations like inline etc.
+include $(BUILD_EXECUTABLE)
+
