@@ -10,11 +10,12 @@ namespace android {
 #define XPOSED_JAR "/data/xposed/XposedBridge.jar"
 #define XPOSED_JAR_NEWVERSION XPOSED_JAR ".newversion"
 #define XPOSED_LOAD_BLOCKER "/data/xposed/disabled"
-#define XPOSED_LIBS "/data/xposed/lib/"
+#define XPOSED_LIBS_ALWAYS "/data/xposed/lib/always/"
+#define XPOSED_LIBS_TESTMODE "/data/xposed/lib/testonly/"
 #define XPOSED_CLASS "de/robv/android/xposed/XposedBridge"
 #define XPOSED_CLASS_DOTS "de.robv.android.xposed.XposedBridge"
 #define XRESOURCES_CLASS "android/content/res/XResources"
-#define XPOSED_VERSION "1.7b5"
+#define XPOSED_VERSION "1.7b6"
 
 extern bool keepLoadingXposed;
 typedef std::list<Method>::iterator XposedOriginalMethodsIt;

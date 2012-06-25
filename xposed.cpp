@@ -59,15 +59,23 @@ bool maybeReplaceLibs(bool zygote) {
     if (!zygote)
         return true;
     
-    char value[PROPERTY_VALUE_MAX];
+    char propReplaced[PROPERTY_VALUE_MAX];
+    char propTestMode[PROPERTY_VALUE_MAX];
     struct stat sb;
     
-    property_get("xposed.libs.replaced", value, "0");
-    if (value[0] == '0') {      
+    property_get("xposed.libs.replaced", propReplaced, "0");
+    property_get("xposed.libs.testmode", propTestMode, "0");
+    bool testmode = (propTestMode[0] == '1');
+    
+    if (propReplaced[0] == '0' || testmode) {
         property_set("xposed.libs.replaced", "1");
+        property_set("xposed.libs.testmode", "0");
     
         // only continue if the lib dir exists
-        if (stat(XPOSED_LIBS, &sb) != 0 || !S_ISDIR(sb.st_mode))
+        bool alwaysDirExists = (stat(XPOSED_LIBS_ALWAYS, &sb) == 0 && S_ISDIR(sb.st_mode));
+        bool testDirExists = (stat(XPOSED_LIBS_TESTMODE, &sb) == 0 && S_ISDIR(sb.st_mode));
+        
+        if (!alwaysDirExists && !(testmode && testDirExists))
             return true;
         
         LOGI("Copying native libraries into /vendor/lib");
@@ -81,7 +89,10 @@ bool maybeReplaceLibs(bool zygote) {
         
         // copy libs
         mkdir("/vendor/lib/", 0755);
-        system("cp -a " XPOSED_LIBS "* /vendor/lib/");
+        if (alwaysDirExists)
+            system("cp -a " XPOSED_LIBS_ALWAYS "* /vendor/lib/");
+        if (testmode && testDirExists)
+            system("cp -a " XPOSED_LIBS_TESTMODE "* /vendor/lib/");
 
         // restart zygote
         property_set("ctl.restart", "surfaceflinger");
