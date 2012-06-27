@@ -100,8 +100,6 @@ public:
         sp<ProcessState> proc = ProcessState::self();
         LOGV("App process: starting thread pool.\n");
         proc->startThreadPool();
-        
-        xposedCallStaticVoidMethod(getJNIEnv(), "onZygoteInit");
     }
 
     virtual void onExit(int code)
