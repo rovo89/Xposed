@@ -55,6 +55,16 @@ bool isXposedDisabled() {
     return false;
 }
 
+static void copyLibs(const char* cmd) {
+    for (int i = 0; i < XPOSED_LIB_COPY_RETRIES; i++) {
+        int ret = system(cmd);
+        if (WIFEXITED(ret) && WEXITSTATUS(ret) == 0)
+            return;
+        
+        LOGE("%s failed with return code %d (%d)", cmd, WEXITSTATUS(ret), ret);
+    }
+}
+
 bool maybeReplaceLibs(bool zygote) {
     if (!zygote)
         return true;
@@ -90,9 +100,9 @@ bool maybeReplaceLibs(bool zygote) {
         // copy libs
         mkdir("/vendor/lib/", 0755);
         if (alwaysDirExists)
-            system("cp -a " XPOSED_LIBS_ALWAYS "* /vendor/lib/");
+            copyLibs("cp -a " XPOSED_LIBS_ALWAYS "* /vendor/lib/");
         if (testmode && testDirExists)
-            system("cp -a " XPOSED_LIBS_TESTMODE "* /vendor/lib/");
+            copyLibs("cp -a " XPOSED_LIBS_TESTMODE "* /vendor/lib/");
 
         // restart zygote
         property_set("ctl.restart", "surfaceflinger");
