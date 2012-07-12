@@ -22,9 +22,14 @@
 #include <sys/wait.h>
 #include <cutils/properties.h>
 #include <sys/mount.h>
+#include <sys/statfs.h>
 
 #ifdef WITH_JIT
 #include <interp/Jit.h>
+#endif
+
+#ifndef RAMFS_MAGIC
+#define RAMFS_MAGIC 0x858458f6
 #endif
 
 namespace android {
@@ -65,6 +70,16 @@ static void copyLibs(const char* cmd) {
     }
 }
 
+static uint getFsType(const char* path) {
+    struct statfs fs;
+    int ret = statfs(path, &fs);
+    if (ret == 0)
+        return fs.f_type;
+    
+    LOGE("could not get file system type of %s: %s", path, strerror(errno));
+    return 0;
+}
+
 bool maybeReplaceLibs(bool zygote) {
     if (!zygote)
         return true;
@@ -85,15 +100,37 @@ bool maybeReplaceLibs(bool zygote) {
         bool alwaysDirExists = (stat(XPOSED_LIBS_ALWAYS, &sb) == 0 && S_ISDIR(sb.st_mode));
         bool testDirExists = (stat(XPOSED_LIBS_TESTMODE, &sb) == 0 && S_ISDIR(sb.st_mode));
         
-        if (!alwaysDirExists && !(testmode && testDirExists))
+        if (!alwaysDirExists && !(testmode && testDirExists)) {
+            LOGE("Source directory for native lib replacement doesn't exist");
             return true;
+        }
         
-        LOGI("Copying native libraries into /vendor/lib");
+        // identify the preferred library path (first directory in LD_LIBRARY_PATH)
+        char* ldLibraryPath = getenv("LD_LIBRARY_PATH");
+        LOGD("LD_LIBRARY_PATH is '%s'", ldLibraryPath);
+        char target[256];
+        strncpy(target, ldLibraryPath, 255);
+        char* sep = strchr(target, ':');
+        if (sep) *sep = 0;
+        char* end = target + strlen(target) - 1;
+        while (*end == '/') { *end = 0; end++; }
+        LOGI("Target for native libraries is '%s'", target);
+        
+        if (strcmp(target, "/vendor/lib") != 0) {
+            LOGE("Currently, native lib replacement only works when /vendor/lib is the preferred library path");
+            return true;
+        }
+        
+        // make sure that /vendor is on a temporary file system (rootfs or tmpfs)
+        uint fsType = getFsType("/vendor");
+        if (fsType != TMPFS_MAGIC && fsType != RAMFS_MAGIC) {
+            LOGE("File system (0x%x) of %s doesn't seem to be temporary", fsType, "/vendor");
+            return true;
+        }
         
         // try remounting the file system root r/w
-        int ret = mount("rootfs", "/", "rootfs", MS_REMOUNT, NULL);
-        if (ret != 0) {
-            LOGE("Could not mount \"/\" r/w, error %d", ret);
+        if (mount("rootfs", "/", "rootfs", MS_REMOUNT, NULL) != 0) {
+            LOGE("Could not mount \"/\" r/w: %s", strerror(errno));
             return true;
         }
         
@@ -103,6 +140,8 @@ bool maybeReplaceLibs(bool zygote) {
             copyLibs("cp -a " XPOSED_LIBS_ALWAYS "* /vendor/lib/");
         if (testmode && testDirExists)
             copyLibs("cp -a " XPOSED_LIBS_TESTMODE "* /vendor/lib/");
+
+        LOGI("Native libraries have been copied");
 
         // restart zygote
         property_set("ctl.restart", "surfaceflinger");

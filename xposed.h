@@ -16,7 +16,7 @@ namespace android {
 #define XPOSED_CLASS_DOTS "de.robv.android.xposed.XposedBridge"
 #define XRESOURCES_CLASS "android/content/res/XResources"
 #define XPOSED_LIB_COPY_RETRIES 5
-#define XPOSED_VERSION "22"
+#define XPOSED_VERSION "23"
 
 extern bool keepLoadingXposed;
 typedef std::list<Method>::iterator XposedOriginalMethodsIt;
