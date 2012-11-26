@@ -76,7 +76,7 @@ public:
         char* slashClassName = toSlashClassName(mClassName);
         mClass = env->FindClass(slashClassName);
         if (mClass == NULL) {
-            LOGE("ERROR: could not find class '%s'\n", mClassName);
+            ALOGE("ERROR: could not find class '%s'\n", mClassName);
         }
         free(slashClassName);
 
@@ -86,7 +86,7 @@ public:
     virtual void onStarted()
     {
         sp<ProcessState> proc = ProcessState::self();
-        LOGV("App process: starting thread pool.\n");
+        ALOGV("App process: starting thread pool.\n");
         proc->startThreadPool();
 
         AndroidRuntime* ar = AndroidRuntime::getRuntime();
@@ -98,7 +98,7 @@ public:
     virtual void onZygoteInit()
     {
         sp<ProcessState> proc = ProcessState::self();
-        LOGV("App process: starting thread pool.\n");
+        ALOGV("App process: starting thread pool.\n");
         proc->startThreadPool();
     }
 

@@ -22,10 +22,18 @@ LOCAL_C_INCLUDES += dalvik \
                     bionic \
                     bionic/libstdc++/include
 
-LOCAL_MODULE := xposed
 LOCAL_MODULE_TAGS := optional
 
 LOCAL_CFLAGS += -DWITH_JIT
+
+# use "mm xposed_target=ics" to compile this in pre-JB source tree for ICS
+ifeq ($(xposed_target),ics)
+LOCAL_MODULE := xposed_ics
+LOCAL_CFLAGS += -DXPOSED_TARGET_ICS
+else
+LOCAL_SHARED_LIBRARIES += libandroidfw
+LOCAL_MODULE := xposed
+endif
 
 include $(BUILD_EXECUTABLE)
 
