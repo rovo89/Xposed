@@ -10,7 +10,7 @@
 #include <android_runtime/AndroidRuntime.h>
 
 #define private public
-#ifdef XPOSED_TARGET_ICS
+#if PLATFORM_SDK_VERSION == 15
 #include <utils/ResourceTypes.h>
 #else
 #include <androidfw/ResourceTypes.h>

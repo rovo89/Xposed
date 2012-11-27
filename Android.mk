@@ -13,6 +13,10 @@ LOCAL_SHARED_LIBRARIES := \
 	libdvm \
 	libstlport
 
+ifneq ($(PLATFORM_SDK_VERSION),15)
+LOCAL_SHARED_LIBRARIES += libandroidfw
+endif
+
 LOCAL_STATIC_LIBRARIES += libbz
 
 LOCAL_C_INCLUDES += dalvik \
@@ -24,16 +28,11 @@ LOCAL_C_INCLUDES += dalvik \
 
 LOCAL_MODULE_TAGS := optional
 
-LOCAL_CFLAGS += -DWITH_JIT
+LOCAL_CFLAGS += -DWITH_JIT -DPLATFORM_SDK_VERSION=$(PLATFORM_SDK_VERSION)
 
-# use "mm xposed_target=ics" to compile this in pre-JB source tree for ICS
-ifeq ($(xposed_target),ics)
-LOCAL_MODULE := xposed_ics
-LOCAL_CFLAGS += -DXPOSED_TARGET_ICS
-else
-LOCAL_SHARED_LIBRARIES += libandroidfw
 LOCAL_MODULE := xposed
-endif
+
+LOCAL_MODULE_STEM := xposed_sdk$(PLATFORM_SDK_VERSION)
 
 include $(BUILD_EXECUTABLE)
 

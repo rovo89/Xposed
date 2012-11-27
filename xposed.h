@@ -18,7 +18,7 @@ namespace android {
 #define XPOSED_LIB_COPY_RETRIES 5
 #define XPOSED_VERSION "24"
 
-#ifdef XPOSED_TARGET_ICS
+#ifndef ALOGD
 #define ALOGD LOGD
 #define ALOGE LOGE
 #define ALOGI LOGI
