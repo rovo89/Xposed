@@ -18,22 +18,10 @@
 #undef private
 
 #include <stdio.h>
-#include <fcntl.h>
-#include <sys/stat.h>
 #include <sys/mman.h>
-#include <bzlib.h>
-#include <sys/ptrace.h>
-#include <sys/wait.h>
-#include <cutils/properties.h>
-#include <sys/mount.h>
-#include <sys/statfs.h>
 
 #ifdef WITH_JIT
 #include <interp/Jit.h>
-#endif
-
-#ifndef RAMFS_MAGIC
-#define RAMFS_MAGIC 0x858458f6
 #endif
 
 namespace android {
@@ -62,97 +50,6 @@ bool isXposedDisabled() {
         return true;
     }
     return false;
-}
-
-static void copyLibs(const char* cmd) {
-    for (int i = 0; i < XPOSED_LIB_COPY_RETRIES; i++) {
-        int ret = system(cmd);
-        if (WIFEXITED(ret) && WEXITSTATUS(ret) == 0)
-            return;
-        
-        ALOGE("%s failed with return code %d (%d)", cmd, WEXITSTATUS(ret), ret);
-    }
-}
-
-static uint getFsType(const char* path) {
-    struct statfs fs;
-    int ret = statfs(path, &fs);
-    if (ret == 0)
-        return fs.f_type;
-    
-    ALOGE("could not get file system type of %s: %s", path, strerror(errno));
-    return 0;
-}
-
-bool maybeReplaceLibs(bool zygote) {
-    if (!zygote)
-        return true;
-    
-    char propReplaced[PROPERTY_VALUE_MAX];
-    char propTestMode[PROPERTY_VALUE_MAX];
-    struct stat sb;
-    
-    property_get("xposed.libs.replaced", propReplaced, "0");
-    property_get("xposed.libs.testmode", propTestMode, "0");
-    bool testmode = (propTestMode[0] == '1');
-    
-    if (propReplaced[0] == '0' || testmode) {
-        property_set("xposed.libs.replaced", "1");
-        property_set("xposed.libs.testmode", "0");
-    
-        // only continue if the lib dir exists
-        bool alwaysDirExists = (stat(XPOSED_LIBS_ALWAYS, &sb) == 0 && S_ISDIR(sb.st_mode));
-        bool testDirExists = (stat(XPOSED_LIBS_TESTMODE, &sb) == 0 && S_ISDIR(sb.st_mode));
-        
-        if (!alwaysDirExists && !(testmode && testDirExists)) {
-            ALOGE("Source directory for native lib replacement doesn't exist");
-            return true;
-        }
-        
-        // identify the preferred library path (first directory in LD_LIBRARY_PATH)
-        char* ldLibraryPath = getenv("LD_LIBRARY_PATH");
-        ALOGD("LD_LIBRARY_PATH is '%s'", ldLibraryPath);
-        char target[256];
-        strncpy(target, ldLibraryPath, 255);
-        char* sep = strchr(target, ':');
-        if (sep) *sep = 0;
-        char* end = target + strlen(target) - 1;
-        while (*end == '/') { *end = 0; end++; }
-        ALOGI("Target for native libraries is '%s'", target);
-        
-        if (strcmp(target, "/vendor/lib") != 0) {
-            ALOGE("Currently, native lib replacement only works when /vendor/lib is the preferred library path");
-            return true;
-        }
-        
-        // make sure that /vendor is on a temporary file system (rootfs or tmpfs)
-        uint fsType = getFsType("/vendor");
-        if (fsType != TMPFS_MAGIC && fsType != RAMFS_MAGIC) {
-            ALOGE("File system (0x%x) of %s doesn't seem to be temporary", fsType, "/vendor");
-            return true;
-        }
-        
-        // try remounting the file system root r/w
-        if (mount("rootfs", "/", "rootfs", MS_REMOUNT, NULL) != 0) {
-            ALOGE("Could not mount \"/\" r/w: %s", strerror(errno));
-            return true;
-        }
-        
-        // copy libs
-        mkdir("/vendor/lib/", 0755);
-        if (alwaysDirExists)
-            copyLibs("cp -a " XPOSED_LIBS_ALWAYS "* /vendor/lib/");
-        if (testmode && testDirExists)
-            copyLibs("cp -a " XPOSED_LIBS_TESTMODE "* /vendor/lib/");
-
-        ALOGI("Native libraries have been copied");
-
-        // restart zygote
-        property_set("ctl.restart", "surfaceflinger");
-        property_set("ctl.restart", "zygote");
-        exit(0);
-    }
-    return true;
 }
 
 bool addXposedToClasspath(bool zygote) {

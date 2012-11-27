@@ -17,21 +17,15 @@ ifneq ($(PLATFORM_SDK_VERSION),15)
 LOCAL_SHARED_LIBRARIES += libandroidfw
 endif
 
-LOCAL_STATIC_LIBRARIES += libbz
-
 LOCAL_C_INCLUDES += dalvik \
                     dalvik/vm \
                     external/stlport/stlport \
-                    external/bzip2 \
                     bionic \
                     bionic/libstdc++/include
 
 LOCAL_MODULE_TAGS := optional
-
 LOCAL_CFLAGS += -DWITH_JIT -DPLATFORM_SDK_VERSION=$(PLATFORM_SDK_VERSION)
-
 LOCAL_MODULE := xposed
-
 LOCAL_MODULE_STEM := xposed_sdk$(PLATFORM_SDK_VERSION)
 
 include $(BUILD_EXECUTABLE)
