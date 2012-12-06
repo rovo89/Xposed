@@ -134,6 +134,11 @@ static void setArgv0(const char *argv0, const char *newArgv0)
 
 int main(int argc, const char* const argv[])
 {
+    if (argc == 2 && strcmp(argv[1], "--xposedversion") == 0) {
+        printf("Xposed version: " XPOSED_VERSION "\n");
+        return 0;
+    }
+
     // These are global variables in ProcessState.cpp
     mArgC = argc;
     mArgV = argv;
