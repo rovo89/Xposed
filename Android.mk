@@ -34,6 +34,7 @@ include $(BUILD_EXECUTABLE)
 include $(CLEAR_VARS)
 LOCAL_SRC_FILES := xposedtest.cpp
 LOCAL_MODULE := xposedtest
+LOCAL_MODULE_STEM := xposedtest_sdk$(PLATFORM_SDK_VERSION)
 LOCAL_MODULE_TAGS := optional
 LOCAL_CFLAGS += -O0 # no optimizations like inline etc.
 include $(BUILD_EXECUTABLE)
