@@ -180,7 +180,7 @@ static void xposedCallHandler(const u4* args, JValue* pResult, const Method* met
     }
     
     jclass objectClass = env->FindClass("java/lang/Object");
-    jobjectArray argsArray = env->NewObjectArray(dvmComputeMethodArgsSize(method), objectClass, NULL);
+    jobjectArray argsArray = env->NewObjectArray(strlen(method->shorty) - 1, objectClass, NULL);
     
     while (*desc != '\0') {
         char descChar = *(desc++);
