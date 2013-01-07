@@ -13,7 +13,7 @@ namespace android {
 #define XPOSED_CLASS "de/robv/android/xposed/XposedBridge"
 #define XPOSED_CLASS_DOTS "de.robv.android.xposed.XposedBridge"
 #define XRESOURCES_CLASS "android/content/res/XResources"
-#define XPOSED_VERSION "29"
+#define XPOSED_VERSION "30"
 
 #ifndef ALOGD
 #define ALOGD LOGD
@@ -26,6 +26,7 @@ extern bool keepLoadingXposed;
 typedef std::list<Method>::iterator XposedOriginalMethodsIt;
 
 // called directoy by app_process
+void xposedInfo();
 bool isXposedDisabled();
 bool xposedShouldIgnoreCommand(const char* className, int argc, const char* const argv[]);
 bool addXposedToClasspath(bool zygote);
