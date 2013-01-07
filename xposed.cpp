@@ -52,6 +52,23 @@ bool isXposedDisabled() {
     return false;
 }
 
+// ignore the broadcasts by Superuser and SuperSU to avoid spamming the Xposed log
+bool xposedShouldIgnoreCommand(const char* className, int argc, const char* const argv[]) {
+    if (className == NULL || argc < 4 || strcmp(className, "com.android.commands.am.Am") != 0)
+        return false;
+        
+    if (strcmp(argv[2], "broadcast"))
+        return false;
+        
+    for (int i = 3; i < argc; i++) {
+        if (strcmp(argv[i], "com.noshufou.android.su.RESULT") == 0
+         || strcmp(argv[i], "eu.chainfire.supersu.NativeAccess") == 0)
+            return true;
+    }
+    
+    return false;
+}
+
 bool addXposedToClasspath(bool zygote) {
     ALOGI("-----------------\n");
     // do we have a new version and are (re)starting zygote? Then load it!

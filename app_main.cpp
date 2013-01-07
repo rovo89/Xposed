@@ -194,7 +194,7 @@ int main(int argc, const char* const argv[])
 
     runtime.mParentDir = parentDir;
     
-    keepLoadingXposed = !isXposedDisabled() && addXposedToClasspath(zygote);
+    keepLoadingXposed = !isXposedDisabled() && !xposedShouldIgnoreCommand(className, argc, argv) && addXposedToClasspath(zygote);
 
     if (zygote) {
         runtime.start(keepLoadingXposed ? XPOSED_CLASS_DOTS : "com.android.internal.os.ZygoteInit",
