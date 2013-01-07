@@ -321,37 +321,16 @@ static void replaceAsm(void* function, char* newCode, int len) {
 // JNI methods
 ////////////////////////////////////////////////////////////
 
-Method* getMethodFromReflectObjWithoutClassInit(jobject jmethod)
-{
-    Object* obj = dvmDecodeIndirectRef(dvmThreadSelf(), jmethod);
-    ClassObject* clazz;
-    int slot;
-
-    if (obj->clazz == gDvm.classJavaLangReflectConstructor) {
-        clazz = (ClassObject*)dvmGetFieldObject(obj,
-                                gDvm.offJavaLangReflectConstructor_declClass);
-        slot = dvmGetFieldInt(obj, gDvm.offJavaLangReflectConstructor_slot);
-    } else if (obj->clazz == gDvm.classJavaLangReflectMethod) {
-        clazz = (ClassObject*)dvmGetFieldObject(obj,
-                                gDvm.offJavaLangReflectMethod_declClass);
-        slot = dvmGetFieldInt(obj, gDvm.offJavaLangReflectMethod_slot);
-    } else {
-        assert(false);
-        return NULL;
-    }
-
-    return dvmSlotToMethod(clazz, slot);
-}
-
-static void de_robv_android_xposed_XposedBridge_hookMethodNative(JNIEnv* env, jclass clazz, jobject reflectedMethod) {
+static void de_robv_android_xposed_XposedBridge_hookMethodNative(JNIEnv* env, jclass clazz, jobject declaredClassIndirect, jint slot) {
     // Usage errors?
-    if (reflectedMethod == NULL) {
-        dvmThrowIllegalArgumentException("method must not be null");
+    if (declaredClassIndirect == NULL) {
+        dvmThrowIllegalArgumentException("declaredClass must not be null");
         return;
     }
     
     // Find the internal representation of the method
-    Method* method = getMethodFromReflectObjWithoutClassInit(reflectedMethod);
+    ClassObject* declaredClass = (ClassObject*) dvmDecodeIndirectRef(dvmThreadSelf(), declaredClassIndirect);
+    Method* method = dvmSlotToMethod(declaredClass, slot);
     if (method == NULL) {
         dvmThrowNoSuchMethodError("could not get internal representation for method");
         return;
@@ -473,7 +452,7 @@ static jobject de_robv_android_xposed_XposedBridge_getStartClassName(JNIEnv* env
 }
 
 static const JNINativeMethod xposedMethods[] = {
-    {"hookMethodNative", "(Ljava/lang/reflect/Member;)V", (void*)de_robv_android_xposed_XposedBridge_hookMethodNative},
+    {"hookMethodNative", "(Ljava/lang/Class;I)V", (void*)de_robv_android_xposed_XposedBridge_hookMethodNative},
     {"invokeOriginalMethodNative", "(Ljava/lang/reflect/Member;[Ljava/lang/Class;Ljava/lang/Class;Ljava/lang/Object;[Ljava/lang/Object;)Ljava/lang/Object;", (void*)de_robv_android_xposed_XposedBridge_invokeOriginalMethodNative},
     {"getStartClassName", "()Ljava/lang/String;", (void*)de_robv_android_xposed_XposedBridge_getStartClassName},
 };
