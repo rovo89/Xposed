@@ -124,9 +124,6 @@ bool xposedOnVmCreated(JNIEnv* env, const char* className) {
         
     // disable some access checks
     char asmReturnTrue[] = { 0x01, 0x20, 0x70, 0x47 };
-    replaceAsm((void*) &dvmCheckClassAccess,  asmReturnTrue, sizeof(asmReturnTrue));
-    replaceAsm((void*) &dvmCheckMethodAccess, asmReturnTrue, sizeof(asmReturnTrue));
-    replaceAsm((void*) &dvmCheckFieldAccess,  asmReturnTrue, sizeof(asmReturnTrue));
     replaceAsm((void*) &dvmInSamePackage,     asmReturnTrue, sizeof(asmReturnTrue));
 
     xposedClass = env->FindClass(XPOSED_CLASS);
