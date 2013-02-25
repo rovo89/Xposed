@@ -7,13 +7,14 @@
 
 namespace android {
 
-#define XPOSED_JAR "/data/xposed/XposedBridge.jar"
-#define XPOSED_JAR_NEWVERSION XPOSED_JAR ".newversion"
-#define XPOSED_LOAD_BLOCKER "/data/xposed/disabled"
+#define XPOSED_DIR "/data/xposed/"
+#define XPOSED_JAR XPOSED_DIR "XposedBridge.jar"
+#define XPOSED_JAR_NEWVERSION XPOSED_DIR "XposedBridge.jar.newversion"
+#define XPOSED_LOAD_BLOCKER XPOSED_DIR "disabled"
 #define XPOSED_CLASS "de/robv/android/xposed/XposedBridge"
 #define XPOSED_CLASS_DOTS "de.robv.android.xposed.XposedBridge"
 #define XRESOURCES_CLASS "android/content/res/XResources"
-#define XPOSED_VERSION "31"
+#define XPOSED_VERSION "32"
 
 #ifndef ALOGD
 #define ALOGD LOGD
