@@ -156,43 +156,6 @@ bool xposedOnVmCreated(JNIEnv* env, const char* className) {
     ALOGI("Found Xposed class '%s', now initializing\n", XPOSED_CLASS);
     register_de_robv_android_xposed_XposedBridge(env);
     register_android_content_res_XResources(env);
-    
-    xposedHandleHookedMethod = env->GetStaticMethodID(xposedClass, "handleHookedMethod",
-        "(Ljava/lang/reflect/Member;Ljava/lang/Object;[Ljava/lang/Object;)Ljava/lang/Object;");
-    if (xposedHandleHookedMethod == NULL) {
-        ALOGE("ERROR: could not find method %s.handleHookedMethod(Method, Object, Object[])\n", XPOSED_CLASS);
-        dvmLogExceptionStackTrace();
-        env->ExceptionClear();
-        return false;
-    }
-    
-    xresourcesClass = env->FindClass(XRESOURCES_CLASS);
-    xresourcesClass = reinterpret_cast<jclass>(env->NewGlobalRef(xresourcesClass));
-    if (xresourcesClass == NULL) {
-        ALOGE("Error while loading XResources class '%s':\n", XRESOURCES_CLASS);
-        dvmLogExceptionStackTrace();
-        env->ExceptionClear();
-        return false;
-    }
-    
-    xresourcesTranslateResId = env->GetStaticMethodID(xresourcesClass, "translateResId",
-        "(ILandroid/content/res/XResources;Landroid/content/res/Resources;)I");
-    if (xresourcesTranslateResId == NULL) {
-        ALOGE("ERROR: could not find method %s.translateResId(int, Resources, Resources)\n", XRESOURCES_CLASS);
-        dvmLogExceptionStackTrace();
-        env->ExceptionClear();
-        return false;
-    }
-    
-    xresourcesTranslateAttrId = env->GetStaticMethodID(xresourcesClass, "translateAttrId",
-        "(Ljava/lang/String;Landroid/content/res/XResources;)I");
-    if (xresourcesTranslateAttrId == NULL) {
-        ALOGE("ERROR: could not find method %s.findAttrId(String, Resources, Resources)\n", XRESOURCES_CLASS);
-        dvmLogExceptionStackTrace();
-        env->ExceptionClear();
-        return false;
-    }
-    
     return true;
 }
 
@@ -354,6 +317,55 @@ static void replaceAsm(void* function, char* newCode, int len) {
 // JNI methods
 ////////////////////////////////////////////////////////////
 
+static bool de_robv_android_xposed_XposedBridge_initNative(JNIEnv* env, jclass clazz) {
+    if (!keepLoadingXposed) {
+        ALOGE("Not initializing Xposed because of previous errors\n");
+        return false;
+    }
+
+    xposedHandleHookedMethod = env->GetStaticMethodID(xposedClass, "handleHookedMethod",
+        "(Ljava/lang/reflect/Member;Ljava/lang/Object;[Ljava/lang/Object;)Ljava/lang/Object;");
+    if (xposedHandleHookedMethod == NULL) {
+        ALOGE("ERROR: could not find method %s.handleHookedMethod(Method, Object, Object[])\n", XPOSED_CLASS);
+        dvmLogExceptionStackTrace();
+        env->ExceptionClear();
+        keepLoadingXposed = false;
+        return false;
+    }
+
+    xresourcesClass = env->FindClass(XRESOURCES_CLASS);
+    xresourcesClass = reinterpret_cast<jclass>(env->NewGlobalRef(xresourcesClass));
+    if (xresourcesClass == NULL) {
+        ALOGE("Error while loading XResources class '%s':\n", XRESOURCES_CLASS);
+        dvmLogExceptionStackTrace();
+        env->ExceptionClear();
+        keepLoadingXposed = false;
+        return false;
+    }
+
+    xresourcesTranslateResId = env->GetStaticMethodID(xresourcesClass, "translateResId",
+        "(ILandroid/content/res/XResources;Landroid/content/res/Resources;)I");
+    if (xresourcesTranslateResId == NULL) {
+        ALOGE("ERROR: could not find method %s.translateResId(int, Resources, Resources)\n", XRESOURCES_CLASS);
+        dvmLogExceptionStackTrace();
+        env->ExceptionClear();
+        keepLoadingXposed = false;
+        return false;
+    }
+
+    xresourcesTranslateAttrId = env->GetStaticMethodID(xresourcesClass, "translateAttrId",
+        "(Ljava/lang/String;Landroid/content/res/XResources;)I");
+    if (xresourcesTranslateAttrId == NULL) {
+        ALOGE("ERROR: could not find method %s.findAttrId(String, Resources, Resources)\n", XRESOURCES_CLASS);
+        dvmLogExceptionStackTrace();
+        env->ExceptionClear();
+        keepLoadingXposed = false;
+        return false;
+    }
+
+    return true;
+}
+
 static void de_robv_android_xposed_XposedBridge_hookMethodNative(JNIEnv* env, jclass clazz, jobject declaredClassIndirect, jint slot) {
     // Usage errors?
     if (declaredClassIndirect == NULL) {
@@ -485,6 +497,7 @@ static jobject de_robv_android_xposed_XposedBridge_getStartClassName(JNIEnv* env
 }
 
 static const JNINativeMethod xposedMethods[] = {
+    {"initNative", "()Z", (void*)de_robv_android_xposed_XposedBridge_initNative},
     {"hookMethodNative", "(Ljava/lang/Class;I)V", (void*)de_robv_android_xposed_XposedBridge_hookMethodNative},
     {"invokeOriginalMethodNative", "(Ljava/lang/reflect/Member;[Ljava/lang/Class;Ljava/lang/Class;Ljava/lang/Object;[Ljava/lang/Object;)Ljava/lang/Object;", (void*)de_robv_android_xposed_XposedBridge_invokeOriginalMethodNative},
     {"getStartClassName", "()Ljava/lang/String;", (void*)de_robv_android_xposed_XposedBridge_getStartClassName},
