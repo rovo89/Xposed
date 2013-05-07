@@ -317,7 +317,7 @@ static void replaceAsm(void* function, char* newCode, int len) {
 // JNI methods
 ////////////////////////////////////////////////////////////
 
-static bool de_robv_android_xposed_XposedBridge_initNative(JNIEnv* env, jclass clazz) {
+static jboolean de_robv_android_xposed_XposedBridge_initNative(JNIEnv* env, jclass clazz) {
     if (!keepLoadingXposed) {
         ALOGE("Not initializing Xposed because of previous errors\n");
         return false;
