@@ -24,7 +24,7 @@ LOCAL_C_INCLUDES += dalvik \
                     bionic/libstdc++/include
 
 LOCAL_MODULE_TAGS := optional
-ifeq ($(strip $(WITH_JIT)),true)
+ifneq ($(TARGET_ARCH),x86)
 LOCAL_CFLAGS += -DWITH_JIT
 endif
 LOCAL_CFLAGS += -DPLATFORM_SDK_VERSION=$(PLATFORM_SDK_VERSION)
