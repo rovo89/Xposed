@@ -136,7 +136,11 @@ bool xposedOnVmCreated(JNIEnv* env, const char* className) {
     startClassName = className;
         
     // disable some access checks
+#ifdef __arm__
     char asmReturnTrue[] = { 0x01, 0x20, 0x70, 0x47 };
+#else
+    char asmReturnTrue[] = { 0x31, 0xC0, 0x40, 0xC3 };
+#endif
     replaceAsm((void*) &dvmCheckClassAccess,  asmReturnTrue, sizeof(asmReturnTrue));
     replaceAsm((void*) &dvmCheckFieldAccess,  asmReturnTrue, sizeof(asmReturnTrue));
     replaceAsm((void*) &dvmInSamePackage,     asmReturnTrue, sizeof(asmReturnTrue));
@@ -303,7 +307,9 @@ static jobject xposedAddLocalReference(::Thread* self, Object* obj) {
 }
 
 static void replaceAsm(void* function, char* newCode, int len) {
+#ifdef __arm__
     function = (void*)((int)function & ~1);
+#endif
     void* pageStart = (void*)((int)function & ~(PAGESIZE-1));
     mprotect(pageStart, PAGESIZE, PROT_READ | PROT_WRITE | PROT_EXEC);
     memcpy(function, newCode, len);

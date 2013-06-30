@@ -24,7 +24,10 @@ LOCAL_C_INCLUDES += dalvik \
                     bionic/libstdc++/include
 
 LOCAL_MODULE_TAGS := optional
-LOCAL_CFLAGS += -DWITH_JIT -DPLATFORM_SDK_VERSION=$(PLATFORM_SDK_VERSION)
+ifeq ($(strip $(WITH_JIT)),true)
+LOCAL_CFLAGS += -DWITH_JIT
+endif
+LOCAL_CFLAGS += -DPLATFORM_SDK_VERSION=$(PLATFORM_SDK_VERSION)
 LOCAL_MODULE := xposed
 LOCAL_MODULE_STEM := app_process_xposed_sdk$(PLATFORM_SDK_VERSION)
 
