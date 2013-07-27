@@ -1,0 +1,161 @@
+diff --git a/libdex/InstrUtils.h b/libdex/InstrUtils.h
+index ad2bc34..06841f4 100644
+--- a/libdex/InstrUtils.h
++++ b/libdex/InstrUtils.h
+@@ -36,6 +36,7 @@
+  *  - the switch inside dumpInstruction() in DexDump.c
+  */
+ typedef unsigned char InstructionFormat;
++#ifndef __cplusplus
+ enum InstructionFormat {
+     kFmtUnknown = 0,
+     kFmt10x,        // op
+@@ -71,6 +72,7 @@ enum InstructionFormat {
+     kFmt3rinline,   // [opt] inline invoke/range
+     kFmt51l,        // op vAA, #+BBBBBBBBBBBBBBBB
+ };
++#endif
+ 
+ /*
+  * Holds the contents of a decoded instruction.
+@@ -94,6 +96,7 @@ typedef signed char InstructionWidth;
+  * control can flow to next.  Expected to fit in 8 bits.
+  */
+ typedef unsigned char InstructionFlags;
++#ifndef __cplusplus
+ enum InstructionFlags {
+     kInstrCanBranch     = 1,        // conditional or unconditional branch
+     kInstrCanContinue   = 1 << 1,   // flow can continue to next statement
+@@ -103,6 +106,7 @@ enum InstructionFlags {
+     kInstrInvoke        = 1 << 5,   // a flavor of invoke
+     kInstrUnconditional = 1 << 6,   // unconditional branch
+ };
++#endif
+ 
+ 
+ /*
+diff --git a/vm/IndirectRefTable.h b/vm/IndirectRefTable.h
+index 6a4db04..0b1323d 100644
+--- a/vm/IndirectRefTable.h
++++ b/vm/IndirectRefTable.h
+@@ -234,10 +234,12 @@ INLINE u4 dvmIndirectRefToIndex(IndirectRef iref)
+ /*
+  * Determine what kind of indirect reference this is.
+  */
++#ifndef __cplusplus
+ INLINE IndirectRefKind dvmGetIndirectRefType(IndirectRef iref)
+ {
+     return (u4) iref & 0x03;
+ }
++#endif
+ 
+ /*
+  * Initialize an IndirectRefTable.
+diff --git a/vm/analysis/RegisterMap.h b/vm/analysis/RegisterMap.h
+index 7897d45..99cc8bb 100644
+--- a/vm/analysis/RegisterMap.h
++++ b/vm/analysis/RegisterMap.h
+@@ -66,9 +66,11 @@ void dvmRegisterMapShutdown(void);
+ /*
+  * Get the format.
+  */
++#ifndef __cplusplus
+ INLINE RegisterMapFormat dvmRegisterMapGetFormat(const RegisterMap* pMap) {
+     return pMap->format & ~(kRegMapFormatOnHeap);
+ }
++#endif
+ 
+ /*
+  * Set the format.
+@@ -247,6 +249,7 @@ RegisterMap* dvmGenerateRegisterMapV(VerifierData* vdata);
+  * (This is expected to be called at GC time.)
+  */
+ const RegisterMap* dvmGetExpandedRegisterMap0(Method* method);
++#ifndef __cplusplus
+ INLINE const RegisterMap* dvmGetExpandedRegisterMap(Method* method)
+ {
+     const RegisterMap* curMap = method->registerMap;
+@@ -259,6 +262,7 @@ INLINE const RegisterMap* dvmGetExpandedRegisterMap(Method* method)
+         return dvmGetExpandedRegisterMap0(method);
+     }
+ }
++#endif
+ 
+ /* dump stats gathered during register map creation process */
+ void dvmRegisterMapDumpStats(void);
+diff --git a/vm/oo/ObjectInlines.h b/vm/oo/ObjectInlines.h
+index 23a72b2..5ddf711 100644
+--- a/vm/oo/ObjectInlines.h
++++ b/vm/oo/ObjectInlines.h
+@@ -75,9 +75,11 @@ INLINE float dvmGetFieldFloat(const Object* obj, int offset) {
+ INLINE double dvmGetFieldDouble(const Object* obj, int offset) {
+     return ((JValue*)BYTE_OFFSET(obj, offset))->d;
+ }
++#ifndef __cplusplus
+ INLINE Object* dvmGetFieldObject(const Object* obj, int offset) {
+     return ((JValue*)BYTE_OFFSET(obj, offset))->l;
+ }
++#endif
+ INLINE bool dvmGetFieldBooleanVolatile(const Object* obj, int offset) {
+     s4* ptr = &((JValue*)BYTE_OFFSET(obj, offset))->i;
+     return (bool)android_atomic_acquire_load(ptr);
+@@ -104,6 +106,7 @@ INLINE float dvmGetFieldFloatVolatile(const Object* obj, int offset) {
+     alias.ival = android_atomic_acquire_load(ptr);
+     return alias.fval;
+ }
++#ifndef __cplusplus
+ INLINE s8 dvmGetFieldLongVolatile(const Object* obj, int offset) {
+     const s8* addr = BYTE_OFFSET(obj, offset);
+     s8 val = dvmQuasiAtomicRead64(addr);
+@@ -117,6 +120,7 @@ INLINE double dvmGetFieldDoubleVolatile(const Object* obj, int offset) {
+     ANDROID_MEMBAR_FULL();
+     return alias.dval;
+ }
++#endif
+ INLINE Object* dvmGetFieldObjectVolatile(const Object* obj, int offset) {
+     void** ptr = &((JValue*)BYTE_OFFSET(obj, offset))->l;
+     return (Object*)android_atomic_acquire_load((int32_t*)ptr);
+@@ -146,6 +150,7 @@ INLINE void dvmSetFieldLong(Object* obj, int offset, s8 val) {
+ INLINE void dvmSetFieldDouble(Object* obj, int offset, double val) {
+     ((JValue*)BYTE_OFFSET(obj, offset))->d = val;
+ }
++#ifndef __cplusplus
+ INLINE void dvmSetFieldObject(Object* obj, int offset, Object* val) {
+     JValue* lhs = BYTE_OFFSET(obj, offset);
+     lhs->l = val;
+@@ -153,6 +158,7 @@ INLINE void dvmSetFieldObject(Object* obj, int offset, Object* val) {
+         dvmWriteBarrierField(obj, &lhs->l);
+     }
+ }
++#endif
+ INLINE void dvmSetFieldIntVolatile(Object* obj, int offset, s4 val) {
+     s4* ptr = &((JValue*)BYTE_OFFSET(obj, offset))->i;
+     android_atomic_release_store(val, ptr);
+@@ -174,6 +180,7 @@ INLINE void dvmSetFieldFloatVolatile(Object* obj, int offset, float val) {
+     alias.fval = val;
+     dvmSetFieldIntVolatile(obj, offset, alias.ival);
+ }
++#ifndef __cplusplus
+ INLINE void dvmSetFieldLongVolatile(Object* obj, int offset, s8 val) {
+     s8* addr = BYTE_OFFSET(obj, offset);
+     ANDROID_MEMBAR_FULL();
+@@ -184,6 +191,7 @@ INLINE void dvmSetFieldDoubleVolatile(Object* obj, int offset, double val) {
+     alias.dval = val;
+     dvmSetFieldLongVolatile(obj, offset, alias.lval);
+ }
++#endif
+ INLINE void dvmSetFieldObjectVolatile(Object* obj, int offset, Object* val) {
+     void** ptr = &((JValue*)BYTE_OFFSET(obj, offset))->l;
+     android_atomic_release_store((int32_t)val, (int32_t*)ptr);
+@@ -223,9 +231,11 @@ INLINE s8 dvmGetStaticFieldLong(const StaticField* sfield) {
+ INLINE double dvmGetStaticFieldDouble(const StaticField* sfield) {
+     return sfield->value.d;
+ }
++#ifndef __cplusplus
+ INLINE Object* dvmGetStaticFieldObject(const StaticField* sfield) {
+     return sfield->value.l;
+ }
++#endif
+ INLINE bool dvmGetStaticFieldBooleanVolatile(const StaticField* sfield) {
+     const s4* ptr = &(sfield->value.i);
+     return (bool)android_atomic_acquire_load((s4*)ptr);
