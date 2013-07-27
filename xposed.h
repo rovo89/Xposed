@@ -2,7 +2,13 @@
 #define XPOSED_H_
 
 #define ANDROID_SMP 0
+#if PLATFORM_SDK_VERSION < 14
+extern "C" {
+#endif
 #include "Dalvik.h"
+#if PLATFORM_SDK_VERSION < 14
+}
+#endif
 #include <list>
 
 namespace android {

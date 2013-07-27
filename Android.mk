@@ -13,7 +13,7 @@ LOCAL_SHARED_LIBRARIES := \
 	libdvm \
 	libstlport
 
-ifneq ($(PLATFORM_SDK_VERSION),15)
+ifneq ($(shell expr $(PLATFORM_SDK_VERSION) \> 15), 0)
 LOCAL_SHARED_LIBRARIES += libandroidfw
 endif
 
