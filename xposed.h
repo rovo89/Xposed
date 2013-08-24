@@ -14,7 +14,7 @@ namespace android {
 #define XPOSED_CLASS "de/robv/android/xposed/XposedBridge"
 #define XPOSED_CLASS_DOTS "de.robv.android.xposed.XposedBridge"
 #define XRESOURCES_CLASS "android/content/res/XResources"
-#define XPOSED_VERSION "34"
+#define XPOSED_VERSION "35"
 
 #ifndef ALOGD
 #define ALOGD LOGD
