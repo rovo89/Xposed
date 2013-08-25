@@ -3,6 +3,7 @@ include $(CLEAR_VARS)
 
 LOCAL_SRC_FILES := \
 	app_main.cpp \
+	disablercombo.cpp \
 	xposed.cpp
 
 LOCAL_SHARED_LIBRARIES := \

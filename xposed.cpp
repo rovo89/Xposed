@@ -62,6 +62,13 @@ void xposedInfo() {
     ALOGD("ROM: %s\n", rom);
 }
 
+void disableXposed() {
+    int fd;
+    fd = open(XPOSED_LOAD_BLOCKER, O_WRONLY | O_CREAT, S_IRUSR | S_IWUSR);
+    if (fd >= 0)
+        close(fd);
+}
+
 bool isXposedDisabled() {
     // is the blocker file present?
     if (access(XPOSED_LOAD_BLOCKER, F_OK) == 0) {

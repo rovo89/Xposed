@@ -26,8 +26,9 @@ namespace android {
 extern bool keepLoadingXposed;
 typedef std::list<Method>::iterator XposedOriginalMethodsIt;
 
-// called directoy by app_process
+// called directly by app_process
 void xposedInfo();
+void disableXposed();
 bool isXposedDisabled();
 bool xposedShouldIgnoreCommand(const char* className, int argc, const char* const argv[]);
 bool addXposedToClasspath(bool zygote);

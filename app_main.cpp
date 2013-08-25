@@ -194,6 +194,10 @@ int main(int argc, const char* const argv[])
 
     runtime.mParentDir = parentDir;
     
+    if (zygote) {
+        if (xposed::detectDisableCombo())
+            disableXposed();
+    }
     xposedInfo();
     keepLoadingXposed = !isXposedDisabled() && !xposedShouldIgnoreCommand(className, argc, argv) && addXposedToClasspath(zygote);
 
