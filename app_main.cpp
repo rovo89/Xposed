@@ -12,11 +12,11 @@
 #include <utils/Log.h>
 #include <cutils/process_name.h>
 #include <cutils/memory.h>
+#include <cutils/properties.h>
 #include <android_runtime/AndroidRuntime.h>
 #include <dlfcn.h>
 
 #if PLATFORM_SDK_VERSION >= 16
-#include <cutils/properties.h>
 #include <sys/personality.h>
 #endif
 
