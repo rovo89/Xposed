@@ -13,16 +13,20 @@
 #include <cutils/process_name.h>
 #include <cutils/memory.h>
 #include <android_runtime/AndroidRuntime.h>
+#include <dlfcn.h>
 
-#if PLATFORM_SDK_VERSION >= 18
+#if PLATFORM_SDK_VERSION >= 16
 #include <cutils/properties.h>
-#include <cutils/trace.h>
 #include <sys/personality.h>
 #endif
 
 #include <stdio.h>
 #include <unistd.h>
 #include "xposed.h"
+
+int RUNNING_PLATFORM_SDK_VERSION = 0;
+void (*PTR_atrace_set_tracing_enabled)(bool) = NULL;
+
 
 namespace android {
 
@@ -31,6 +35,24 @@ void app_usage()
     fprintf(stderr,
         "Usage: app_process [java-options] cmd-dir start-class-name [options]\n");
     fprintf(stderr, "   with Xposed support (version " XPOSED_VERSION ")\n");
+}
+
+void initTypePointers()
+{
+    char sdk[PROPERTY_VALUE_MAX];
+    const char *error;
+
+    property_get("ro.build.version.sdk", sdk, "0");
+    RUNNING_PLATFORM_SDK_VERSION = atoi(sdk);
+
+    dlerror();
+
+    if (RUNNING_PLATFORM_SDK_VERSION >= 18) {
+        *(void **) (&PTR_atrace_set_tracing_enabled) = dlsym(RTLD_DEFAULT, "atrace_set_tracing_enabled");
+        if ((error = dlerror()) != NULL) {
+            ALOGE("Could not find address for function atrace_set_tracing_enabled: %s", error);
+        }
+    }
 }
 
 class AppRuntime : public AndroidRuntime
@@ -103,10 +125,10 @@ public:
 
     virtual void onZygoteInit()
     {
-#if PLATFORM_SDK_VERSION >= 18
-        // Re-enable tracing now that we're no longer in Zygote.
-        atrace_set_tracing_enabled(true);
-#endif
+        if (PTR_atrace_set_tracing_enabled != NULL) {
+            // Re-enable tracing now that we're no longer in Zygote.
+            PTR_atrace_set_tracing_enabled(true);
+        }
 
         sp<ProcessState> proc = ProcessState::self();
         ALOGV("App process: starting thread pool.\n");
@@ -150,7 +172,7 @@ int main(int argc, char* const argv[])
         return 0;
     }
 
-#if PLATFORM_SDK_VERSION >= 18
+#if PLATFORM_SDK_VERSION >= 16
 #ifdef __arm__
     /*
      * b/7188322 - Temporarily revert to the compat memory layout
@@ -178,6 +200,8 @@ int main(int argc, char* const argv[])
     unsetenv("NO_ADDR_COMPAT_LAYOUT_FIXUP");
 #endif
 #endif
+
+    initTypePointers();
 
     // These are global variables in ProcessState.cpp
     mArgC = argc;
