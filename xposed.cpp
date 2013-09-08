@@ -20,10 +20,10 @@
 #include <stdio.h>
 #include <sys/mman.h>
 #include <cutils/properties.h>
+#include <dlfcn.h>
 
-#ifdef WITH_JIT
-#include <interp/Jit.h>
-#endif
+#include "xposed_offsets.h"
+
 
 namespace android {
 
@@ -38,6 +38,9 @@ jmethodID xresourcesTranslateResId = NULL;
 jmethodID xresourcesTranslateAttrId = NULL;
 std::list<Method> xposedOriginalMethods;
 const char* startClassName = NULL;
+void* PTR_gDvmJit = NULL;
+
+
 
 
 ////////////////////////////////////////////////////////////
@@ -134,7 +137,9 @@ bool xposedOnVmCreated(JNIEnv* env, const char* className) {
         return false;
         
     startClassName = className;
-        
+
+    xposedInitMemberOffsets();
+
     // disable some access checks
     patchReturnTrue((void*) &dvmCheckClassAccess);
     patchReturnTrue((void*) &dvmCheckFieldAccess);
@@ -159,6 +164,23 @@ bool xposedOnVmCreated(JNIEnv* env, const char* className) {
 }
 
 
+static void xposedInitMemberOffsets() {
+    PTR_gDvmJit = dlsym(RTLD_DEFAULT, "gDvmJit");
+
+    if (PTR_gDvmJit == NULL) {
+        offsetMode = MEMBER_OFFSET_MODE_NO_JIT;
+    } else {
+        offsetMode = MEMBER_OFFSET_MODE_WITH_JIT;
+    }
+    ALOGD("Using structure member offsets for mode %s", xposedOffsetModesDesc[offsetMode]);
+
+    MEMBER_OFFSET_COPY(Thread, jniLocalRefTable);
+    MEMBER_OFFSET_COPY(Thread, status);
+    MEMBER_OFFSET_COPY(Thread, jniEnv);
+    MEMBER_OFFSET_COPY(DvmJitGlobals, codeCacheFull);
+}
+
+
 ////////////////////////////////////////////////////////////
 // handling hooked methods / helpers
 ////////////////////////////////////////////////////////////
@@ -170,8 +192,8 @@ static void xposedCallHandler(const u4* args, JValue* pResult, const Method* met
         return;
     }
     
-    ThreadStatus oldThreadStatus = self->status;
-    JNIEnv* env = self->jniEnv;
+    ThreadStatus oldThreadStatus = MEMBER_VAL(self, Thread, status);
+    JNIEnv* env = MEMBER_VAL(self, Thread, jniEnv);
     
     // get java.lang.reflect.Method object for original method
     jobject originalReflected = env->ToReflectedMethod(
@@ -284,7 +306,7 @@ static jobject xposedAddLocalReference(::Thread* self, Object* obj) {
         return NULL;
     }
 
-    IndirectRefTable* pRefTable = &self->jniLocalRefTable;
+    IndirectRefTable* pRefTable = MEMBER_PTR(self, Thread, jniLocalRefTable);
     void* curFrame = self->interpSave.curFrame;
     u4 cookie = SAVEAREA_FROM_FP(curFrame)->xtra.localRefCookie;
     jobject jobj = (jobject) pRefTable->add(cookie, obj);
@@ -409,10 +431,11 @@ static void de_robv_android_xposed_XposedBridge_hookMethodNative(JNIEnv* env, jc
     method->nativeFunc = &xposedCallHandler;
     method->registersSize = method->insSize;
     method->outsSize = 0;
-    #ifdef WITH_JIT
-    // reset JIT cache
-    gDvmJit.codeCacheFull = true;
-    #endif
+
+    if (PTR_gDvmJit != NULL) {
+        // reset JIT cache
+        MEMBER_VAL(PTR_gDvmJit, DvmJitGlobals, codeCacheFull) = true;
+    }
 }
 
 // simplified copy of Method.invokeNative, but calls the original (non-hooked) method and has no access checks
