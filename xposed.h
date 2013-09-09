@@ -20,7 +20,7 @@ namespace android {
 #define XPOSED_CLASS "de/robv/android/xposed/XposedBridge"
 #define XPOSED_CLASS_DOTS "de.robv.android.xposed.XposedBridge"
 #define XRESOURCES_CLASS "android/content/res/XResources"
-#define XPOSED_VERSION "34"
+#define XPOSED_VERSION "37"
 
 #ifndef ALOGD
 #define ALOGD LOGD
@@ -44,6 +44,7 @@ static void xposedCallHandler(const u4* args, JValue* pResult, const Method* met
 static XposedOriginalMethodsIt findXposedOriginalMethod(const Method* method);
 static jobject xposedAddLocalReference(::Thread* self, Object* obj);
 static void replaceAsm(void* function, char* newCode, int len);
+static void patchReturnTrue(void* function);
 
 // JNI methods
 static jboolean de_robv_android_xposed_XposedBridge_initNative(JNIEnv* env, jclass clazz);

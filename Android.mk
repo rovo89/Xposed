@@ -11,7 +11,8 @@ LOCAL_SHARED_LIBRARIES := \
 	libbinder \
 	libandroid_runtime \
 	libdvm \
-	libstlport
+	libstlport \
+	libdl
 
 ifneq ($(shell expr $(PLATFORM_SDK_VERSION) \> 15), 0)
 LOCAL_SHARED_LIBRARIES += libandroidfw

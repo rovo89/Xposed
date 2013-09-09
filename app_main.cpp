@@ -12,14 +12,24 @@
 #include <utils/Log.h>
 #include <cutils/process_name.h>
 #include <cutils/memory.h>
+#include <cutils/properties.h>
 #define private public
 #include <android_runtime/AndroidRuntime.h>
 #undef private
 #include <sys/stat.h>
+#include <dlfcn.h>
+
+#if PLATFORM_SDK_VERSION >= 16
+#include <sys/personality.h>
+#endif
 
 #include <stdio.h>
 #include <unistd.h>
 #include "xposed.h"
+
+int RUNNING_PLATFORM_SDK_VERSION = 0;
+void (*PTR_atrace_set_tracing_enabled)(bool) = NULL;
+
 
 namespace android {
 
@@ -28,6 +38,24 @@ void app_usage()
     fprintf(stderr,
         "Usage: app_process [java-options] cmd-dir start-class-name [options]\n");
     fprintf(stderr, "   with Xposed support (version " XPOSED_VERSION ")\n");
+}
+
+void initTypePointers()
+{
+    char sdk[PROPERTY_VALUE_MAX];
+    const char *error;
+
+    property_get("ro.build.version.sdk", sdk, "0");
+    RUNNING_PLATFORM_SDK_VERSION = atoi(sdk);
+
+    dlerror();
+
+    if (RUNNING_PLATFORM_SDK_VERSION >= 18) {
+        *(void **) (&PTR_atrace_set_tracing_enabled) = dlsym(RTLD_DEFAULT, "atrace_set_tracing_enabled");
+        if ((error = dlerror()) != NULL) {
+            ALOGE("Could not find address for function atrace_set_tracing_enabled: %s", error);
+        }
+    }
 }
 
 class AppRuntime : public AndroidRuntime
@@ -247,6 +275,11 @@ bail:
 
     virtual void onZygoteInit()
     {
+        if (PTR_atrace_set_tracing_enabled != NULL) {
+            // Re-enable tracing now that we're no longer in Zygote.
+            PTR_atrace_set_tracing_enabled(true);
+        }
+
         sp<ProcessState> proc = ProcessState::self();
         ALOGV("App process: starting thread pool.\n");
         proc->startThreadPool();
@@ -284,12 +317,43 @@ static void setArgv0(const char *argv0, const char *newArgv0)
     strlcpy(const_cast<char *>(argv0), newArgv0, strlen(argv0));
 }
 
-int main(int argc, const char* const argv[])
+int main(int argc, char* const argv[])
 {
     if (argc == 2 && strcmp(argv[1], "--xposedversion") == 0) {
         printf("Xposed version: " XPOSED_VERSION "\n");
         return 0;
     }
+
+#if PLATFORM_SDK_VERSION >= 16
+#ifdef __arm__
+    /*
+     * b/7188322 - Temporarily revert to the compat memory layout
+     * to avoid breaking third party apps.
+     *
+     * THIS WILL GO AWAY IN A FUTURE ANDROID RELEASE.
+     *
+     * http://git.kernel.org/?p=linux/kernel/git/torvalds/linux-2.6.git;a=commitdiff;h=7dbaa466
+     * changes the kernel mapping from bottom up to top-down.
+     * This breaks some programs which improperly embed
+     * an out of date copy of Android's linker.
+     */
+    char value[PROPERTY_VALUE_MAX];
+    property_get("ro.kernel.qemu", value, "");
+    bool is_qemu = (strcmp(value, "1") == 0);
+    if ((getenv("NO_ADDR_COMPAT_LAYOUT_FIXUP") == NULL) && !is_qemu) {
+        int current = personality(0xFFFFFFFF);
+        if ((current & ADDR_COMPAT_LAYOUT) == 0) {
+            personality(current | ADDR_COMPAT_LAYOUT);
+            setenv("NO_ADDR_COMPAT_LAYOUT_FIXUP", "1", 1);
+            execv("/system/bin/app_process", argv);
+            return -1;
+        }
+    }
+    unsetenv("NO_ADDR_COMPAT_LAYOUT_FIXUP");
+#endif
+#endif
+
+    initTypePointers();
 
     // These are global variables in ProcessState.cpp
     mArgC = argc;
