@@ -36,7 +36,7 @@ jmethodID xposedHandleHookedMethod = NULL;
 jclass xresourcesClass = NULL;
 jmethodID xresourcesTranslateResId = NULL;
 jmethodID xresourcesTranslateAttrId = NULL;
-std::list<Method> xposedOriginalMethods;
+std::list<MethodXposedExt> xposedOriginalMethods;
 const char* startClassName = NULL;
 void* PTR_gDvmJit = NULL;
 
@@ -424,7 +424,7 @@ static void de_robv_android_xposed_XposedBridge_hookMethodNative(JNIEnv* env, jc
     }
     
     // Save a copy of the original method
-    xposedOriginalMethods.push_front(*method);
+    xposedOriginalMethods.push_front(*((MethodXposedExt*)method));
 
     // Replace method with our own code
     SET_METHOD_FLAG(method, ACC_NATIVE);

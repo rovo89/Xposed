@@ -5,6 +5,12 @@
 #include "Dalvik.h"
 #include <list>
 
+// copy a few bytes more than defined for Method in AOSP
+// to accomodate for (rare) extensions by the target ROM
+struct MethodXposedExt : Method {
+    int dummyForRomExtensions[4];
+};
+
 namespace android {
 
 #define XPOSED_DIR "/data/xposed/"
@@ -14,7 +20,7 @@ namespace android {
 #define XPOSED_CLASS "de/robv/android/xposed/XposedBridge"
 #define XPOSED_CLASS_DOTS "de.robv.android.xposed.XposedBridge"
 #define XRESOURCES_CLASS "android/content/res/XResources"
-#define XPOSED_VERSION "38"
+#define XPOSED_VERSION "39"
 
 #ifndef ALOGD
 #define ALOGD LOGD
@@ -24,7 +30,7 @@ namespace android {
 #endif
 
 extern bool keepLoadingXposed;
-typedef std::list<Method>::iterator XposedOriginalMethodsIt;
+typedef std::list<MethodXposedExt>::iterator XposedOriginalMethodsIt;
 
 // called directoy by app_process
 void xposedInfo();
