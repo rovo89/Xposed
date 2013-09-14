@@ -335,7 +335,7 @@ static jobject xposedAddLocalReference(::Thread* self, Object* obj) {
     }
 
 #if PLATFORM_SDK_VERSION < 14
-    ReferenceTable* pRefTable = &self->jniLocalRefTable;
+    ReferenceTable* pRefTable = MEMBER_PTR(self, Thread, jniLocalRefTable);
     if (!dvmAddToReferenceTable(pRefTable, obj)) {
         dvmDumpReferenceTable(pRefTable, "JNI local");
         LOGE("Failed adding to JNI local ref table (has %d entries)\n",
