@@ -144,7 +144,7 @@ bool xposedOnVmCreated(JNIEnv* env, const char* className) {
     patchReturnTrue((void*) &dvmCheckClassAccess);
     patchReturnTrue((void*) &dvmCheckFieldAccess);
     patchReturnTrue((void*) &dvmInSamePackage);
-    if (access(XPOSED_DIR "do_not_hook_dvmCheckMethodAccess", F_OK) != 0)
+    if (access(XPOSED_DIR "conf/do_not_hook_dvmCheckMethodAccess", F_OK) != 0)
         patchReturnTrue((void*) &dvmCheckMethodAccess);
 
     xposedClass = env->FindClass(XPOSED_CLASS);
