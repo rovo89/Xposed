@@ -67,7 +67,7 @@ static Object* dvmDecodeIndirectRef(::Thread* self, jobject jobj) {
     if (jobj == NULL) {
         return NULL;
     }
-    return dvmDecodeIndirectRef(self->jniEnv, jobj);
+    return dvmDecodeIndirectRef(MEMBER_VAL(self, Thread, jniEnv), jobj);
 }
 #endif
 
