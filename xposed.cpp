@@ -10,7 +10,7 @@
 #include <android_runtime/AndroidRuntime.h>
 
 #define private public
-#if PLATFORM_SDK_VERSION == 15
+#if PLATFORM_SDK_VERSION <= 15
 #include <utils/ResourceTypes.h>
 #else
 #include <androidfw/ResourceTypes.h>
@@ -42,6 +42,34 @@ void* PTR_gDvmJit = NULL;
 
 
 
+#if PLATFORM_SDK_VERSION < 14
+#define dvmUnboxPrimitive dvmUnwrapPrimitive
+#define dvmBoxPrimitive dvmWrapPrimitive
+
+static void dvmThrowNullPointerException(const char* msg) {
+    dvmThrowException("Ljava/lang/NullPointerException;", msg);
+}
+
+static void dvmThrowClassCastException(ClassObject* actual, ClassObject* desired)
+{
+    dvmThrowExceptionFmt("Ljava/lang/ClassCastException;", "%s cannot be cast to %s", actual->descriptor, desired->descriptor);
+}
+
+static void dvmThrowIllegalArgumentException(const char* msg) {
+    dvmThrowException("Ljava/lang/IllegalArgumentException;", msg);
+}
+
+static void dvmThrowNoSuchMethodError(const char* msg) {
+    dvmThrowException("Ljava/lang/NoSuchMethodError;", msg);
+}
+
+static Object* dvmDecodeIndirectRef(::Thread* self, jobject jobj) {
+    if (jobj == NULL) {
+        return NULL;
+    }
+    return dvmDecodeIndirectRef(MEMBER_VAL(self, Thread, jniEnv), jobj);
+}
+#endif
 
 ////////////////////////////////////////////////////////////
 // called directoy by app_process
@@ -197,7 +225,7 @@ static void xposedCallHandler(const u4* args, JValue* pResult, const Method* met
     
     // get java.lang.reflect.Method object for original method
     jobject originalReflected = env->ToReflectedMethod(
-        (jclass)xposedAddLocalReference(self, original->clazz),
+        (jclass)xposedAddLocalReference(self, (Object*)original->clazz),
         (jmethodID)method,
         true);
   
@@ -306,6 +334,22 @@ static jobject xposedAddLocalReference(::Thread* self, Object* obj) {
         return NULL;
     }
 
+#if PLATFORM_SDK_VERSION < 14
+    ReferenceTable* pRefTable = MEMBER_PTR(self, Thread, jniLocalRefTable);
+    if (!dvmAddToReferenceTable(pRefTable, obj)) {
+        dvmDumpReferenceTable(pRefTable, "JNI local");
+        LOGE("Failed adding to JNI local ref table (has %d entries)\n",
+            (int) dvmReferenceTableEntries(pRefTable));
+        dvmDumpThread(dvmThreadSelf(), false);
+        dvmAbort();     // spec says call FatalError; this is equivalent
+    } else {
+        LOGVV("LREF add %p  (%s.%s) (ent=%d)\n", obj,
+            dvmGetCurrentJNIMethod()->clazz->descriptor,
+            dvmGetCurrentJNIMethod()->name,
+            (int) dvmReferenceTableEntries(pRefTable));
+    }
+    return (jobject) obj;
+#else
     IndirectRefTable* pRefTable = MEMBER_PTR(self, Thread, jniLocalRefTable);
     void* curFrame = self->interpSave.curFrame;
     u4 cookie = SAVEAREA_FROM_FP(curFrame)->xtra.localRefCookie;
@@ -321,6 +365,7 @@ static jobject xposedAddLocalReference(::Thread* self, Object* obj) {
         return reinterpret_cast<jobject>(obj);
     }
     return jobj;
+#endif
 }
 
 static void replaceAsm(void* function, char* newCode, int len) {

@@ -13,7 +13,10 @@
 #include <cutils/process_name.h>
 #include <cutils/memory.h>
 #include <cutils/properties.h>
+#define private public
 #include <android_runtime/AndroidRuntime.h>
+#undef private
+#include <sys/stat.h>
 #include <dlfcn.h>
 
 #if PLATFORM_SDK_VERSION >= 16
@@ -61,7 +64,9 @@ public:
     AppRuntime()
         : mParentDir(NULL)
         , mClassName(NULL)
+#if PLATFORM_SDK_VERSION >= 14
         , mClass(NULL)
+#endif
         , mArgC(0)
         , mArgV(NULL)
     {
@@ -80,6 +85,146 @@ public:
         return mClassName;
     }
 
+#if PLATFORM_SDK_VERSION < 14
+/*
+ * We just want failed write() calls to just return with an error.
+ */
+static void blockSigpipe()
+{
+    sigset_t mask;
+
+    sigemptyset(&mask);
+    sigaddset(&mask, SIGPIPE);
+    if (sigprocmask(SIG_BLOCK, &mask, NULL) != 0)
+        LOGW("WARNING: SIGPIPE not blocked\n");
+}
+
+static int hasDir(const char* dir)
+{
+    struct stat s;
+    int res = stat(dir, &s);
+    if (res == 0) {
+        return S_ISDIR(s.st_mode);
+    }
+    return 0;
+}
+
+/*
+ * Start the Android runtime.  This involves starting the virtual machine
+ * and calling the "static void main(String[] args)" method in the class
+ * named by "className".
+ */
+void start(const char* className, const bool startSystemServer)
+{
+    LOGD("\n>>>>>> AndroidRuntime START %s <<<<<<\n",
+            className != NULL ? className : "(unknown)");
+
+    char* slashClassName = NULL;
+    char* cp;
+    JNIEnv* env;
+
+    blockSigpipe();
+
+    /*
+     * 'startSystemServer == true' means runtime is obsolete and not run from
+     * init.rc anymore, so we print out the boot start event here.
+     */
+    if (startSystemServer) {
+        /* track our progress through the boot sequence */
+        const int LOG_BOOT_PROGRESS_START = 3000;
+        LOG_EVENT_LONG(LOG_BOOT_PROGRESS_START,
+                       ns2ms(systemTime(SYSTEM_TIME_MONOTONIC)));
+    }
+
+    const char* rootDir = getenv("ANDROID_ROOT");
+    if (rootDir == NULL) {
+        rootDir = "/system";
+        if (!hasDir("/system")) {
+            LOG_FATAL("No root directory specified, and /android does not exist.");
+            goto bail;
+        }
+        setenv("ANDROID_ROOT", rootDir, 1);
+    }
+
+    //const char* kernelHack = getenv("LD_ASSUME_KERNEL");
+    //LOGD("Found LD_ASSUME_KERNEL='%s'\n", kernelHack);
+
+    /* start the virtual machine */
+    if (startVm(&mJavaVM, &env) != 0)
+        goto bail;
+
+    keepLoadingXposed = xposedOnVmCreated(env, mClassName);
+
+    /*
+     * Register android functions.
+     */
+    if (startReg(env) < 0) {
+        LOGE("Unable to register all android natives\n");
+        goto bail;
+    }
+
+    /*
+     * We want to call main() with a String array with arguments in it.
+     * At present we only have one argument, the class name.  Create an
+     * array to hold it.
+     */
+    jclass stringClass;
+    jobjectArray strArray;
+    jstring classNameStr;
+    jstring startSystemServerStr;
+
+    stringClass = env->FindClass("java/lang/String");
+    assert(stringClass != NULL);
+    strArray = env->NewObjectArray(2, stringClass, NULL);
+    assert(strArray != NULL);
+    classNameStr = env->NewStringUTF(className);
+    assert(classNameStr != NULL);
+    env->SetObjectArrayElement(strArray, 0, classNameStr);
+    startSystemServerStr = env->NewStringUTF(startSystemServer ?
+                                                 "true" : "false");
+    env->SetObjectArrayElement(strArray, 1, startSystemServerStr);
+
+    /*
+     * Start VM.  This thread becomes the main thread of the VM, and will
+     * not return until the VM exits.
+     */
+    jclass startClass;
+    jmethodID startMeth;
+
+    slashClassName = strdup(className);
+    for (cp = slashClassName; *cp != '\0'; cp++)
+        if (*cp == '.')
+            *cp = '/';
+
+    startClass = env->FindClass(slashClassName);
+    if (startClass == NULL) {
+        LOGE("JavaVM unable to locate class '%s'\n", slashClassName);
+        /* keep going */
+    } else {
+        startMeth = env->GetStaticMethodID(startClass, "main",
+            "([Ljava/lang/String;)V");
+        if (startMeth == NULL) {
+            LOGE("JavaVM unable to find main() in '%s'\n", className);
+            /* keep going */
+        } else {
+            env->CallStaticVoidMethod(startClass, startMeth, strArray);
+#if 0
+            if (env->ExceptionCheck())
+                LOGE("there is exception");
+#endif
+        }
+    }
+
+    LOGD("Shutting down VM\n");
+    if (mJavaVM->DetachCurrentThread() != JNI_OK)
+        LOGW("Warning: unable to detach main thread\n");
+    if (mJavaVM->DestroyJavaVM() != 0)
+        LOGW("Warning: VM did not shut down cleanly\n");
+
+bail:
+    free(slashClassName);
+}
+#else
     virtual void onVmCreated(JNIEnv* env)
     {
         keepLoadingXposed = xposedOnVmCreated(env, mClassName);
@@ -110,6 +255,7 @@ public:
 
         mClass = reinterpret_cast<jclass>(env->NewGlobalRef(mClass));
     }
+#endif
 
     virtual void onStarted()
     {
@@ -118,7 +264,11 @@ public:
         proc->startThreadPool();
 
         AndroidRuntime* ar = AndroidRuntime::getRuntime();
+#if PLATFORM_SDK_VERSION < 14
+        ar->callMain(mClassName, mArgC, mArgV);
+#else
         ar->callMain(mClassName, mClass, mArgC, mArgV);
+#endif
 
         IPCThreadState::self()->stopProcess();
     }
@@ -148,7 +298,9 @@ public:
 
     const char* mParentDir;
     const char* mClassName;
+#if PLATFORM_SDK_VERSION >= 14
     jclass mClass;
+#endif
     int mArgC;
     const char* const* mArgV;
 };
@@ -263,14 +415,22 @@ int main(int argc, char* const argv[])
 
     if (zygote) {
         runtime.start(keepLoadingXposed ? XPOSED_CLASS_DOTS : "com.android.internal.os.ZygoteInit",
+#if PLATFORM_SDK_VERSION < 14
+                startSystemServer);
+#else
                 startSystemServer ? "start-system-server" : "");
+#endif
     } else if (className) {
         // Remainder of args get passed to startup class main()
         runtime.mClassName = className;
         runtime.mArgC = argc - i;
         runtime.mArgV = argv + i;
         runtime.start(keepLoadingXposed ? XPOSED_CLASS_DOTS : "com.android.internal.os.RuntimeInit",
+#if PLATFORM_SDK_VERSION < 14
+                false);
+#else
                 application ? "application" : "tool");
+#endif
     } else {
         fprintf(stderr, "Error: no class name or --zygote supplied.\n");
         app_usage();
