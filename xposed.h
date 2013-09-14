@@ -11,6 +11,12 @@ extern "C" {
 #endif
 #include <list>
 
+// copy a few bytes more than defined for Method in AOSP
+// to accomodate for (rare) extensions by the target ROM
+struct MethodXposedExt : Method {
+    int dummyForRomExtensions[4];
+};
+
 namespace android {
 
 #define XPOSED_DIR "/data/xposed/"
@@ -20,7 +26,7 @@ namespace android {
 #define XPOSED_CLASS "de/robv/android/xposed/XposedBridge"
 #define XPOSED_CLASS_DOTS "de.robv.android.xposed.XposedBridge"
 #define XRESOURCES_CLASS "android/content/res/XResources"
-#define XPOSED_VERSION "37"
+#define XPOSED_VERSION "39"
 
 #ifndef ALOGD
 #define ALOGD LOGD
@@ -30,7 +36,7 @@ namespace android {
 #endif
 
 extern bool keepLoadingXposed;
-typedef std::list<Method>::iterator XposedOriginalMethodsIt;
+typedef std::list<MethodXposedExt>::iterator XposedOriginalMethodsIt;
 
 // called directoy by app_process
 void xposedInfo();
@@ -38,6 +44,7 @@ bool isXposedDisabled();
 bool xposedShouldIgnoreCommand(const char* className, int argc, const char* const argv[]);
 bool addXposedToClasspath(bool zygote);
 bool xposedOnVmCreated(JNIEnv* env, const char* className);
+static void xposedInitMemberOffsets();
 
 // handling hooked methods / helpers
 static void xposedCallHandler(const u4* args, JValue* pResult, const Method* method, ::Thread* self);
