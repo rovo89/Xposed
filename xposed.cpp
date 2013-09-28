@@ -288,9 +288,8 @@ static XposedOriginalMethodsIt findXposedOriginalMethod(const Method* method) {
 
     XposedOriginalMethodsIt it;
     for (XposedOriginalMethodsIt it = xposedOriginalMethods.begin() ; it != xposedOriginalMethods.end(); it++ ) {
-        if (strcmp(it->name, method->name) == 0
-         && strcmp(it->clazz->descriptor, method->clazz->descriptor) == 0
-         && dexProtoCompare(&it->prototype, &method->prototype) == 0) {
+        if (strcmp(it->clazz->descriptor, method->clazz->descriptor) == 0
+         && dvmCompareMethodNamesAndProtos(&(*it), method) == 0) {
             return it;
         }
     }
