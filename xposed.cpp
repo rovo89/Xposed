@@ -323,7 +323,7 @@ static jobject xposedAddLocalReference(::Thread* self, Object* obj) {
     return jobj;
 }
 
-static void replaceAsm(void* function, char* newCode, int len) {
+static void replaceAsm(void* function, unsigned const char* newCode, int len) {
 #ifdef __arm__
     function = (void*)((int)function & ~1);
 #endif
@@ -336,8 +336,8 @@ static void replaceAsm(void* function, char* newCode, int len) {
 
 static void patchReturnTrue(void* function) {
 #ifdef __arm__
-    char asmReturnTrueThumb[] = { 0x01, 0x20, 0x70, 0x47 };
-    char asmReturnTrueArm[] = { 0x01, 0x00, 0xA0, 0xE3, 0x1E, 0xFF, 0x2F, 0xE1 };
+    unsigned const char asmReturnTrueThumb[] = { 0x01, 0x20, 0x70, 0x47 };
+    unsigned const char asmReturnTrueArm[] = { 0x01, 0x00, 0xA0, 0xE3, 0x1E, 0xFF, 0x2F, 0xE1 };
     if ((int)function & 1)
         replaceAsm(function, asmReturnTrueThumb, sizeof(asmReturnTrueThumb));
     else

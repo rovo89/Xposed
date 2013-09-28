@@ -2,7 +2,7 @@
 #include <fcntl.h>
 #include <sys/mman.h>
 
-static void replaceAsm(void* function, char* newCode, int len) {
+static void replaceAsm(void* function, unsigned const char* newCode, int len) {
 #ifdef __arm__
     function = (void*)((int)function & ~1);
 #endif
@@ -28,9 +28,9 @@ int main(int argc, const char* const argv[]) {
     }
     
 #ifdef __arm__
-    char asmReturn42[] = { 42, 0x20, 0x70, 0x47 };
+    unsigned const char asmReturn42[] = { 42, 0x20, 0x70, 0x47 };
 #else
-    char asmReturn42[] = { 0xB8, 42, 0x00, 0x00, 0x00, 0xC3 };
+    unsigned const char asmReturn42[] = { 0xB8, 42, 0x00, 0x00, 0x00, 0xC3 };
 #endif
     replaceAsm((void*) asmReplaceTest,  asmReturn42, sizeof(asmReturn42));
     
