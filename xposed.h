@@ -44,7 +44,7 @@ static void xposedInitMemberOffsets();
 static void xposedCallHandler(const u4* args, JValue* pResult, const Method* method, ::Thread* self);
 static XposedOriginalMethodsIt findXposedOriginalMethod(const Method* method);
 static jobject xposedAddLocalReference(::Thread* self, Object* obj);
-static void replaceAsm(void* function, char* newCode, int len);
+static void replaceAsm(void* function, unsigned const char* newCode, int len);
 static void patchReturnTrue(void* function);
 
 // JNI methods
