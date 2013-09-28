@@ -342,7 +342,7 @@ static void patchReturnTrue(void* function) {
     else
         replaceAsm(function, asmReturnTrueArm, sizeof(asmReturnTrueArm));
 #else
-    char asmReturnTrueX86[] = { 0x31, 0xC0, 0x40, 0xC3 };
+    unsigned const char asmReturnTrueX86[] = { 0x31, 0xC0, 0x40, 0xC3 };
     replaceAsm(function, asmReturnTrueX86, sizeof(asmReturnTrueX86));
 #endif
 }
