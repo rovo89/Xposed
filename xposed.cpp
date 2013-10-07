@@ -147,6 +147,16 @@ bool xposedOnVmCreated(JNIEnv* env, const char* className) {
     if (access(XPOSED_DIR "conf/do_not_hook_dvmCheckMethodAccess", F_OK) != 0)
         patchReturnTrue((void*) &dvmCheckMethodAccess);
 
+    jclass miuiResourcesClass = env->FindClass(MIUI_RESOURCES_CLASS);
+    if (miuiResourcesClass != NULL) {
+        ClassObject* clazz = (ClassObject*)dvmDecodeIndirectRef(dvmThreadSelf(), miuiResourcesClass);
+        if (dvmIsFinalClass(clazz)) {
+            ALOGD("Removing final flag for class '%s'", MIUI_RESOURCES_CLASS);
+            clazz->accessFlags &= ~ACC_FINAL;
+        }
+    }
+    env->ExceptionClear();
+
     xposedClass = env->FindClass(XPOSED_CLASS);
     xposedClass = reinterpret_cast<jclass>(env->NewGlobalRef(xposedClass));
     
