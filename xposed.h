@@ -21,7 +21,7 @@ namespace android {
 #define XPOSED_CLASS_DOTS "de.robv.android.xposed.XposedBridge"
 #define XRESOURCES_CLASS "android/content/res/XResources"
 #define MIUI_RESOURCES_CLASS "android/content/res/MiuiResources"
-#define XPOSED_VERSION "42"
+#define XPOSED_VERSION "43"
 
 #ifndef ALOGD
 #define ALOGD LOGD

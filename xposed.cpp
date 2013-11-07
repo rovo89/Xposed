@@ -168,8 +168,10 @@ bool xposedOnVmCreated(JNIEnv* env, const char* className) {
     }
     
     ALOGI("Found Xposed class '%s', now initializing\n", XPOSED_CLASS);
-    register_de_robv_android_xposed_XposedBridge(env);
-    register_android_content_res_XResources(env);
+    if (register_de_robv_android_xposed_XposedBridge(env) != JNI_OK) {
+        ALOGE("Could not register natives for '%s'\n", XPOSED_CLASS);
+        return false;
+    }
     return true;
 }
 
@@ -388,6 +390,10 @@ static jboolean de_robv_android_xposed_XposedBridge_initNative(JNIEnv* env, jcla
         keepLoadingXposed = false;
         return false;
     }
+    if (register_android_content_res_XResources(env) != JNI_OK) {
+        ALOGE("Could not register natives for '%s'\n", XRESOURCES_CLASS);
+        return false;
+    }
 
     xresourcesTranslateResId = env->GetStaticMethodID(xresourcesClass, "translateResId",
         "(ILandroid/content/res/XResources;Landroid/content/res/Resources;)I");
@@ -544,10 +550,10 @@ static jobject de_robv_android_xposed_XposedBridge_getStartClassName(JNIEnv* env
 }
 
 static const JNINativeMethod xposedMethods[] = {
+    {"getStartClassName", "()Ljava/lang/String;", (void*)de_robv_android_xposed_XposedBridge_getStartClassName},
     {"initNative", "()Z", (void*)de_robv_android_xposed_XposedBridge_initNative},
     {"hookMethodNative", "(Ljava/lang/Class;I)V", (void*)de_robv_android_xposed_XposedBridge_hookMethodNative},
     {"invokeOriginalMethodNative", "(Ljava/lang/reflect/Member;[Ljava/lang/Class;Ljava/lang/Class;Ljava/lang/Object;[Ljava/lang/Object;)Ljava/lang/Object;", (void*)de_robv_android_xposed_XposedBridge_invokeOriginalMethodNative},
-    {"getStartClassName", "()Ljava/lang/String;", (void*)de_robv_android_xposed_XposedBridge_getStartClassName},
 };
 
 static const JNINativeMethod xresourcesMethods[] = {
@@ -555,11 +561,11 @@ static const JNINativeMethod xresourcesMethods[] = {
 };
 
 static int register_de_robv_android_xposed_XposedBridge(JNIEnv* env) {
-    return AndroidRuntime::registerNativeMethods(env, XPOSED_CLASS, xposedMethods, NELEM(xposedMethods));
+    return env->RegisterNatives(xposedClass, xposedMethods, NELEM(xposedMethods));
 }
 
 static int register_android_content_res_XResources(JNIEnv* env) {
-    return AndroidRuntime::registerNativeMethods(env, XRESOURCES_CLASS, xresourcesMethods, NELEM(xresourcesMethods));
+    return env->RegisterNatives(xresourcesClass, xresourcesMethods, NELEM(xresourcesMethods));
 }
 
 }
