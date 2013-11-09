@@ -34,8 +34,8 @@ struct XposedHookInfo {
         int dummyForRomExtensions[4];
     } originalMethodStruct;
 
-    jobject reflectedMethod;
-    jobject additionalInfo;
+    Object* reflectedMethod;
+    Object* additionalInfo;
 };
 
 // called directoy by app_process
