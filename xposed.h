@@ -57,8 +57,7 @@ static inline bool xposedIsHooked(const Method* method);
 static jboolean de_robv_android_xposed_XposedBridge_initNative(JNIEnv* env, jclass clazz);
 static void de_robv_android_xposed_XposedBridge_hookMethodNative(JNIEnv* env, jclass clazz, jobject reflectedMethodIndirect,
             jobject declaredClassIndirect, jint slot, jobject additionalInfoIndirect);
-static jobject de_robv_android_xposed_XposedBridge_invokeOriginalMethodNative(JNIEnv* env, jclass clazz, jobject reflectedMethod,
-            jobjectArray params1, jclass returnType1, jobject thisObject1, jobjectArray args1);
+static void de_robv_android_xposed_XposedBridge_invokeOriginalMethodNative(const u4* args, JValue* pResult, const Method* method, ::Thread* self);
 static void android_content_res_XResources_rewriteXmlReferencesNative(JNIEnv* env, jclass clazz,
             jint parserPtr, jobject origRes, jobject repRes);
 static int register_de_robv_android_xposed_XposedBridge(JNIEnv* env);
