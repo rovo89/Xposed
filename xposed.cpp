@@ -260,7 +260,7 @@ static void xposedCallHandler(const u4* args, JValue* pResult, const Method* met
     // call the Java handler function
     JValue result;
     dvmCallMethod(self, xposedHandleHookedMethod, NULL, &result,
-        originalReflected, additionalInfo, thisObject, argsArray);
+        originalReflected, (int) original, additionalInfo, thisObject, argsArray);
         
     dvmReleaseTrackedAlloc(argsArray, self);
 
@@ -326,9 +326,9 @@ static jboolean de_robv_android_xposed_XposedBridge_initNative(JNIEnv* env, jcla
     ::Thread* self = dvmThreadSelf();
 
     xposedHandleHookedMethod = (Method*) env->GetStaticMethodID(xposedClass, "handleHookedMethod",
-        "(Ljava/lang/reflect/Member;Ljava/lang/Object;Ljava/lang/Object;[Ljava/lang/Object;)Ljava/lang/Object;");
+        "(Ljava/lang/reflect/Member;ILjava/lang/Object;Ljava/lang/Object;[Ljava/lang/Object;)Ljava/lang/Object;");
     if (xposedHandleHookedMethod == NULL) {
-        ALOGE("ERROR: could not find method %s.handleHookedMethod(Member, Object, Object, Object[])\n", XPOSED_CLASS);
+        ALOGE("ERROR: could not find method %s.handleHookedMethod(Member, int, Object, Object, Object[])\n", XPOSED_CLASS);
         dvmLogExceptionStackTrace();
         env->ExceptionClear();
         keepLoadingXposed = false;
@@ -336,9 +336,9 @@ static jboolean de_robv_android_xposed_XposedBridge_initNative(JNIEnv* env, jcla
     }
 
     Method* xposedInvokeOriginalMethodNative = (Method*) env->GetStaticMethodID(xposedClass, "invokeOriginalMethodNative",
-        "(Ljava/lang/reflect/Member;[Ljava/lang/Class;Ljava/lang/Class;Ljava/lang/Object;[Ljava/lang/Object;)Ljava/lang/Object;");
+        "(Ljava/lang/reflect/Member;I[Ljava/lang/Class;Ljava/lang/Class;Ljava/lang/Object;[Ljava/lang/Object;)Ljava/lang/Object;");
     if (xposedInvokeOriginalMethodNative == NULL) {
-        ALOGE("ERROR: could not find method %s.invokeOriginalMethodNative(Member, Class[], Class, Object, Object[])\n", XPOSED_CLASS);
+        ALOGE("ERROR: could not find method %s.invokeOriginalMethodNative(Member, int, Class[], Class, Object, Object[])\n", XPOSED_CLASS);
         dvmLogExceptionStackTrace();
         env->ExceptionClear();
         keepLoadingXposed = false;
@@ -440,15 +440,17 @@ static inline bool xposedIsHooked(const Method* method) {
 // used when a method has been hooked
 static void de_robv_android_xposed_XposedBridge_invokeOriginalMethodNative(const u4* args, JValue* pResult,
             const Method* method, ::Thread* self) {
-    Method* meth = dvmGetMethodFromReflectObj((Object*) args[0]);
-    ArrayObject* params = (ArrayObject*) args[1];
-    ClassObject* returnType = (ClassObject*) args[2];
-    Object* thisObject = (Object*) args[3]; // null for static methods
-    ArrayObject* argList = (ArrayObject*) args[4];
-
-    // try to find the original method
-    if (xposedIsHooked(meth))
-        meth = (Method*) meth->insns;
+    Method* meth = (Method*) args[1];
+    if (meth == NULL) {
+        meth = dvmGetMethodFromReflectObj((Object*) args[0]);
+        if (xposedIsHooked(meth)) {
+            meth = (Method*) meth->insns;
+        }
+    }
+    ArrayObject* params = (ArrayObject*) args[2];
+    ClassObject* returnType = (ClassObject*) args[3];
+    Object* thisObject = (Object*) args[4]; // null for static methods
+    ArrayObject* argList = (ArrayObject*) args[5];
 
     // invoke the method
     pResult->l = dvmInvokeMethod(thisObject, meth, argList, params, returnType, true);
