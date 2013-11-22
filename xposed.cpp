@@ -24,6 +24,8 @@
 
 #include "xposed_offsets.h"
 
+extern int RUNNING_PLATFORM_SDK_VERSION;
+
 
 namespace android {
 
@@ -63,6 +65,18 @@ void xposedInfo() {
     ALOGD("Starting Xposed binary version %s, compiled for SDK %d\n", XPOSED_VERSION, PLATFORM_SDK_VERSION);
     ALOGD("Phone: %s (%s), Android version %s (SDK %s)\n", model, manufacturer, release, sdk);
     ALOGD("ROM: %s\n", rom);
+}
+
+void xposedEnforceDalvik() {
+    if (RUNNING_PLATFORM_SDK_VERSION < 19)
+        return;
+
+    char runtime[PROPERTY_VALUE_MAX];
+    property_get("persist.sys.dalvik.vm.lib", runtime, "");
+    if (strcmp(runtime, "libdvm.so") != 0) {
+        ALOGE("Unsupported runtime library %s, setting to libdvm.so", runtime);
+        property_set("persist.sys.dalvik.vm.lib", "libdvm.so");
+    }
 }
 
 bool isXposedDisabled() {
