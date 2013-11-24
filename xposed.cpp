@@ -155,11 +155,11 @@ bool xposedOnVmCreated(JNIEnv* env, const char* className) {
     xposedInitMemberOffsets();
 
     // disable some access checks
-    patchReturnTrue((void*) &dvmCheckClassAccess);
-    patchReturnTrue((void*) &dvmCheckFieldAccess);
-    patchReturnTrue((void*) &dvmInSamePackage);
+    patchReturnTrue((uintptr_t) &dvmCheckClassAccess);
+    patchReturnTrue((uintptr_t) &dvmCheckFieldAccess);
+    patchReturnTrue((uintptr_t) &dvmInSamePackage);
     if (access(XPOSED_DIR "conf/do_not_hook_dvmCheckMethodAccess", F_OK) != 0)
-        patchReturnTrue((void*) &dvmCheckMethodAccess);
+        patchReturnTrue((uintptr_t) &dvmCheckMethodAccess);
 
     jclass miuiResourcesClass = env->FindClass(MIUI_RESOURCES_CLASS);
     if (miuiResourcesClass != NULL) {
@@ -300,22 +300,27 @@ static void xposedCallHandler(const u4* args, JValue* pResult, const Method* met
 }
 
 
-static void replaceAsm(void* function, unsigned const char* newCode, int len) {
+static void replaceAsm(uintptr_t function, unsigned const char* newCode, size_t len) {
 #ifdef __arm__
-    function = (void*)((int)function & ~1);
+    function = function & ~1;
 #endif
-    void* pageStart = (void*)((int)function & ~(PAGESIZE-1));
-    mprotect(pageStart, PAGESIZE, PROT_READ | PROT_WRITE | PROT_EXEC);
-    memcpy(function, newCode, len);
-    mprotect(pageStart, PAGESIZE, PROT_READ | PROT_EXEC);
-    __clear_cache(function, (char*)function+len);
+    uintptr_t pageStart = function & ~(PAGESIZE-1);
+    size_t pageProtectSize = PAGESIZE;
+    if (function+len > pageStart+pageProtectSize)
+        pageProtectSize += PAGESIZE;
+
+    mprotect((void*)pageStart, pageProtectSize, PROT_READ | PROT_WRITE | PROT_EXEC);
+    memcpy((void*)function, newCode, len);
+    mprotect((void*)pageStart, pageProtectSize, PROT_READ | PROT_EXEC);
+
+    __clear_cache((void*)function, (void*)(function+len));
 }
 
-static void patchReturnTrue(void* function) {
+static void patchReturnTrue(uintptr_t function) {
 #ifdef __arm__
     unsigned const char asmReturnTrueThumb[] = { 0x01, 0x20, 0x70, 0x47 };
     unsigned const char asmReturnTrueArm[] = { 0x01, 0x00, 0xA0, 0xE3, 0x1E, 0xFF, 0x2F, 0xE1 };
-    if ((int)function & 1)
+    if (function & 1)
         replaceAsm(function, asmReturnTrueThumb, sizeof(asmReturnTrueThumb));
     else
         replaceAsm(function, asmReturnTrueArm, sizeof(asmReturnTrueArm));

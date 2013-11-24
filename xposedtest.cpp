@@ -2,15 +2,20 @@
 #include <fcntl.h>
 #include <sys/mman.h>
 
-static void replaceAsm(void* function, unsigned const char* newCode, int len) {
+static void replaceAsm(uintptr_t function, unsigned const char* newCode, size_t len) {
 #ifdef __arm__
-    function = (void*)((int)function & ~1);
+    function = function & ~1;
 #endif
-    void* pageStart = (void*)((int)function & ~(PAGESIZE-1));
-    mprotect(pageStart, PAGESIZE, PROT_READ | PROT_WRITE | PROT_EXEC);
-    memcpy(function, newCode, len);
-    mprotect(pageStart, PAGESIZE, PROT_READ | PROT_EXEC);
-    __clear_cache(function, (char*)function+len);
+    uintptr_t pageStart = function & ~(PAGESIZE-1);
+    size_t pageProtectSize = PAGESIZE;
+    if (function+len > pageStart+pageProtectSize)
+        pageProtectSize += PAGESIZE;
+
+    mprotect((void*)pageStart, pageProtectSize, PROT_READ | PROT_WRITE | PROT_EXEC);
+    memcpy((void*)function, newCode, len);
+    mprotect((void*)pageStart, pageProtectSize, PROT_READ | PROT_EXEC);
+
+    __clear_cache((void*)function, (void*)(function+len));
 }
 
 static int asmReplaceTest()
@@ -32,7 +37,7 @@ int main(int argc, const char* const argv[]) {
 #else
     unsigned const char asmReturn42[] = { 0xB8, 42, 0x00, 0x00, 0x00, 0xC3 };
 #endif
-    replaceAsm((void*) asmReplaceTest,  asmReturn42, sizeof(asmReturn42));
+    replaceAsm((uintptr_t) asmReplaceTest,  asmReturn42, sizeof(asmReturn42));
     
     result = asmReplaceTest();
     if (result != 42) {

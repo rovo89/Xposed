@@ -15,7 +15,7 @@ namespace android {
 #define XPOSED_CLASS_DOTS "de.robv.android.xposed.XposedBridge"
 #define XRESOURCES_CLASS "android/content/res/XResources"
 #define MIUI_RESOURCES_CLASS "android/content/res/MiuiResources"
-#define XPOSED_VERSION "45"
+#define XPOSED_VERSION "46"
 
 #ifndef ALOGD
 #define ALOGD LOGD
@@ -50,8 +50,8 @@ static void xposedInitMemberOffsets();
 // handling hooked methods / helpers
 static void xposedCallHandler(const u4* args, JValue* pResult, const Method* method, ::Thread* self);
 static jobject xposedAddLocalReference(::Thread* self, Object* obj);
-static void replaceAsm(void* function, unsigned const char* newCode, int len);
-static void patchReturnTrue(void* function);
+static void replaceAsm(uintptr_t function, unsigned const char* newCode, int len);
+static void patchReturnTrue(uintptr_t function);
 static inline bool xposedIsHooked(const Method* method);
 
 // JNI methods
