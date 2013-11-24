@@ -302,11 +302,11 @@ static void xposedCallHandler(const u4* args, JValue* pResult, const Method* met
 
 static void replaceAsm(void* function, unsigned const char* newCode, int len) {
 #ifdef __arm__
-    function = (void*)((size_t)function & ~1);
+    function = (void*)((uintptr_t)function & ~1);
 #endif
-    void* pageStart = (void*)((size_t)function & ~(PAGESIZE-1));
+    void* pageStart = (void*)((uintptr_t)function & ~(PAGESIZE-1));
     int size = PAGESIZE;
-    if ((size_t)pageStart+PAGESIZE <= (size_t)function+len)
+    if ((uintptr_t)pageStart+PAGESIZE < (uintptr_t)function+len)
         size *= 2;
 
     mprotect(pageStart, size, PROT_READ | PROT_WRITE | PROT_EXEC);
