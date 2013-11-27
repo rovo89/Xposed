@@ -50,7 +50,7 @@ static void xposedInitMemberOffsets();
 // handling hooked methods / helpers
 static void xposedCallHandler(const u4* args, JValue* pResult, const Method* method, ::Thread* self);
 static jobject xposedAddLocalReference(::Thread* self, Object* obj);
-static void replaceAsm(uintptr_t function, unsigned const char* newCode, int len);
+static void replaceAsm(uintptr_t function, unsigned const char* newCode, size_t len);
 static void patchReturnTrue(uintptr_t function);
 static inline bool xposedIsHooked(const Method* method);
 
