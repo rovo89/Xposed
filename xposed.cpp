@@ -41,6 +41,7 @@ jmethodID xresourcesTranslateResId = NULL;
 jmethodID xresourcesTranslateAttrId = NULL;
 const char* startClassName = NULL;
 void* PTR_gDvmJit = NULL;
+size_t arrayContentsOffset = 0;
 
 
 
@@ -147,12 +148,11 @@ bool addXposedToClasspath(bool zygote) {
 
 
 bool xposedOnVmCreated(JNIEnv* env, const char* className) {
-    if (!keepLoadingXposed)
-        return false;
-        
     startClassName = className;
 
-    xposedInitMemberOffsets();
+    keepLoadingXposed = keepLoadingXposed && xposedInitMemberOffsets(env);
+    if (!keepLoadingXposed)
+        return false;
 
     // disable some access checks
     patchReturnTrue((uintptr_t) &dvmCheckClassAccess);
@@ -190,7 +190,7 @@ bool xposedOnVmCreated(JNIEnv* env, const char* className) {
 }
 
 
-static void xposedInitMemberOffsets() {
+static bool xposedInitMemberOffsets(JNIEnv* env) {
     PTR_gDvmJit = dlsym(RTLD_DEFAULT, "gDvmJit");
 
     if (PTR_gDvmJit == NULL) {
@@ -201,6 +201,33 @@ static void xposedInitMemberOffsets() {
     ALOGD("Using structure member offsets for mode %s", xposedOffsetModesDesc[offsetMode]);
 
     MEMBER_OFFSET_COPY(DvmJitGlobals, codeCacheFull);
+
+    // detect offset of ArrayObject->contents
+    jintArray dummyArray = env->NewIntArray(1);
+    if (dummyArray == NULL) {
+        ALOGE("Could allocate int array for testing");
+        dvmLogExceptionStackTrace();
+        env->ExceptionClear();
+        return false;
+    }
+
+    jint* dummyArrayElements = env->GetIntArrayElements(dummyArray, NULL);
+    arrayContentsOffset = (size_t)dummyArrayElements - (size_t)dvmDecodeIndirectRef(dvmThreadSelf(), dummyArray);
+    env->ReleaseIntArrayElements(dummyArray,dummyArrayElements, 0);
+    env->DeleteLocalRef(dummyArray);
+
+    if (arrayContentsOffset < 12 || arrayContentsOffset > 128) {
+        ALOGE("Detected strange offset %d of ArrayObject->contents", arrayContentsOffset);
+        return false;
+    }
+
+    return true;
+}
+
+static inline void xposedSetObjectArrayElement(const ArrayObject* obj, int index, Object* val) {
+    uintptr_t arrayContents = (uintptr_t)obj + arrayContentsOffset;
+    ((Object **)arrayContents)[index] = val;
+    dvmWriteBarrierArray(obj, index, index + 1);
 }
 
 
@@ -268,7 +295,7 @@ static void xposedCallHandler(const u4* args, JValue* pResult, const Method* met
             obj = NULL;
             srcIndex++;
         }
-        dvmSetObjectArrayElement(argsArray, dstIndex++, obj);
+        xposedSetObjectArrayElement(argsArray, dstIndex++, obj);
     }
     
     // call the Java handler function

@@ -15,7 +15,7 @@ namespace android {
 #define XPOSED_CLASS_DOTS "de.robv.android.xposed.XposedBridge"
 #define XRESOURCES_CLASS "android/content/res/XResources"
 #define MIUI_RESOURCES_CLASS "android/content/res/MiuiResources"
-#define XPOSED_VERSION "46"
+#define XPOSED_VERSION "47"
 
 #ifndef ALOGD
 #define ALOGD LOGD
@@ -45,7 +45,8 @@ bool isXposedDisabled();
 bool xposedShouldIgnoreCommand(const char* className, int argc, const char* const argv[]);
 bool addXposedToClasspath(bool zygote);
 bool xposedOnVmCreated(JNIEnv* env, const char* className);
-static void xposedInitMemberOffsets();
+static bool xposedInitMemberOffsets(JNIEnv* env);
+static inline void xposedSetObjectArrayElement(const ArrayObject* obj, int index, Object* val);
 
 // handling hooked methods / helpers
 static void xposedCallHandler(const u4* args, JValue* pResult, const Method* method, ::Thread* self);
