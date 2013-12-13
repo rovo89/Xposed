@@ -134,7 +134,7 @@ bool addXposedToClasspath(bool zygote) {
             setenv("CLASSPATH", XPOSED_JAR, 1);
         } else {
             char classPath[4096];
-            sprintf(classPath, "%s:%s", XPOSED_JAR, oldClassPath);
+            snprintf(classPath, sizeof(classPath), "%s:%s", XPOSED_JAR, oldClassPath);
             setenv("CLASSPATH", classPath, 1);
         }
         ALOGI("Added Xposed (%s) to CLASSPATH.\n", XPOSED_JAR);
