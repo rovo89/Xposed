@@ -135,7 +135,11 @@ bool addXposedToClasspath(bool zygote) {
             setenv("CLASSPATH", XPOSED_JAR, 1);
         } else {
             char classPath[4096];
-            sprintf(classPath, "%s:%s", XPOSED_JAR, oldClassPath);
+            int newLength = snprintf(classPath, sizeof(classPath), "%s:%s", XPOSED_JAR, oldClassPath);
+            if (newLength >= sizeof(classPath)) {
+                ALOGE("ERROR: CLASSPATH would exceed 4096 characters");
+                return false;
+            }
             setenv("CLASSPATH", classPath, 1);
         }
         ALOGI("Added Xposed (%s) to CLASSPATH.\n", XPOSED_JAR);
