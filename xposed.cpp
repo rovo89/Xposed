@@ -20,6 +20,9 @@
 #include <stdio.h>
 #include <sys/mman.h>
 #include <cutils/properties.h>
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <fcntl.h>
 #include <dlfcn.h>
 
 #include "xposed_offsets.h"
@@ -77,6 +80,17 @@ void xposedEnforceDalvik() {
     if (strcmp(runtime, "libdvm.so") != 0) {
         ALOGE("Unsupported runtime library %s, setting to libdvm.so", runtime);
         property_set("persist.sys.dalvik.vm.lib", "libdvm.so");
+    }
+}
+
+void setXposedState(bool enabled) {
+    if (enabled) {
+        unlink(XPOSED_LOAD_BLOCKER);
+    } else {
+        int fd;
+        fd = open(XPOSED_LOAD_BLOCKER, O_WRONLY | O_CREAT, S_IRUSR | S_IWUSR);
+        if (fd >= 0)
+            close(fd);
     }
 }
 

@@ -41,6 +41,7 @@ struct XposedHookInfo {
 // called directoy by app_process
 void xposedInfo();
 void xposedEnforceDalvik();
+void setXposedState(bool enabled);
 bool isXposedDisabled();
 bool xposedShouldIgnoreCommand(const char* className, int argc, const char* const argv[]);
 bool addXposedToClasspath(bool zygote);
