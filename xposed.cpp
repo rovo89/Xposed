@@ -83,15 +83,11 @@ void xposedEnforceDalvik() {
     }
 }
 
-void setXposedState(bool enabled) {
-    if (enabled) {
-        unlink(XPOSED_LOAD_BLOCKER);
-    } else {
-        int fd;
-        fd = open(XPOSED_LOAD_BLOCKER, O_WRONLY | O_CREAT, S_IRUSR | S_IWUSR);
-        if (fd >= 0)
-            close(fd);
-    }
+void disableXposed() {
+    int fd;
+    fd = open(XPOSED_LOAD_BLOCKER, O_WRONLY | O_CREAT, S_IRUSR | S_IWUSR);
+    if (fd >= 0)
+        close(fd);
 }
 
 bool isXposedDisabled() {

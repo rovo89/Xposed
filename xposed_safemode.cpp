@@ -1,16 +1,15 @@
 /*
  * Detects input combinations for recovering from bootloops.
  *
- * The trigger is detected if upon entry one of the VOLUME keys is being held down,
- * the POWER or HOME key is pressed and released twice (DISABLE) or 3 times (ENABLE)
- * and the VOLUME key is then released.
+ * The safemode trigger is detected if upon entry one of the VOLUME keys is being
+ * held down, the POWER or HOME key is pressed and released twice and the
+ * VOLUME key is then released.
  * All this must happen within 10s of the start of the detection. No delay exists
  * if no VOLUME keys are held down, or as soon as they are released.
  *
  * Feedback:
  * - 2 short vibrations when entering the detection, if a VOLUME key is held down
- * - 2 short vibrations after the DISABLE sequence is successfully detected
- * - 3 short vibrations after the ENABLE sequence is successfully detected
+ * - 2 short vibrations after the safemode sequence is successfully detected
  * - 1 short vibration if the detection timed out or an invalid sequence was used
  *
  * References:
@@ -110,7 +109,7 @@ static int openKeyDevices(int *fds, int max_fds, bool *volKeyPressed) {
 
 namespace xposed {
 
-bool detectSafemodeTrigger(bool *enabled) {
+bool detectSafemodeTrigger() {
 
     // Descriptors for input devices
     int fds[MAX_DEVICES];
@@ -222,17 +221,8 @@ bool detectSafemodeTrigger(bool *enabled) {
 
 
     if (releasedVol && triggerPresses == 2) {
-        // Trigger the DISABLED action
-        if (enabled != NULL)
-            *enabled = false;
+        // Trigger safemode
         vibrate(2);
-        return true;
-
-    } else if (releasedVol && triggerPresses == 3) {
-        // Trigger the ENABLED action
-        if (enabled != NULL)
-            *enabled = true;
-        vibrate(3);
         return true;
 
     } else {

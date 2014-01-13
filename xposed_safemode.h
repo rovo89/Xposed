@@ -3,7 +3,7 @@
 
 namespace xposed {
 
-bool detectSafemodeTrigger(bool *enable);
+bool detectSafemodeTrigger();
 
 }
 

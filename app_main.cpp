@@ -176,9 +176,8 @@ int main(int argc, char* const argv[])
     if (argc == 2 && strcmp(argv[1], "--xposedtestsafemode") == 0) {
         printf("Testing Xposed safemode trigger\n");
 
-        bool enable;
-        if (xposed::detectSafemodeTrigger(&enable)) {
-            printf("Safemode triggered, result=%s\n", enable ? "ENABLE" : "DISABLE");
+        if (xposed::detectSafemodeTrigger()) {
+            printf("Safemode triggered\n");
         } else {
             printf("Safemode not triggered\n");
         }
@@ -265,10 +264,8 @@ int main(int argc, char* const argv[])
     }
 
     if (zygote) {
-        bool enable;
-        if (xposed::detectSafemodeTrigger(&enable)) {
-            setXposedState(enable);
-        }
+        if (xposed::detectSafemodeTrigger())
+            disableXposed();
     }
 
     if (niceName && *niceName) {
