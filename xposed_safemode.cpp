@@ -1,8 +1,8 @@
 /*
  * Detects input combinations for recovering from bootloops.
  *
- * The safemode trigger is detected if one of the physical keys is pressed in the
- * first 2 seconds after detection startup (or already held down), and a total of
+ * The safemode trigger is detected if exactly one of the physical keys is pressed in
+ * the first 2 seconds after detection startup (or already held down), and a total of
  * 5 consecutive presses of that same key are performed in the subsequent 5 seconds.
  *
  * 2 short vibrations are performed when the first key is pressed; an additional
@@ -121,8 +121,13 @@ static int openKeyDevices(int *fds, int max_fds, int *pressedKey) {
         ioctl(fd, EVIOCGKEY(sizeof(keyBitmask)), keyBitmask);
         for (size_t i = 0; i < sizeof(physical_keycodes) / sizeof(physical_keycodes[0]); i++) {
             if (test_bit(physical_keycodes[i], keyBitmask)) {
-                *pressedKey = physical_keycodes[i];
-                break;
+                if (*pressedKey == 0) {
+                    *pressedKey = physical_keycodes[i];
+                } else {
+                    // More than one key is pressed, abort
+                    *pressedKey = 0;
+                    break;
+                }
             }
         }
     }
