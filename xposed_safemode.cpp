@@ -35,6 +35,7 @@
 #define VIBRATOR_CONTROL "/sys/class/timed_output/vibrator/enable"
 #define VIBRATION_SHORT 150
 #define VIBRATION_LONG 500
+#define VIBRATION_INTERVAL 50
 
 static const char *DEVICE_PATH = "/dev/input";
 #define MAX_DEVICES 4
@@ -67,7 +68,21 @@ static void vibrate(int count, int duration_ms, int interval_ms) {
 }
 
 
-
+/*
+ * Enumerates the existing input devices and opens handles for the ones that
+ * report the relevant keys.
+ *
+ * Arguments:
+ * - *fds: is filled on output with the file handles for the opened devices
+ * - max_fds: maximum available entries in the fds array
+ * - *pressedKey: is filled on output with
+ *        0 if no key was found being held down at this instant
+ *       -1 if more than one key was found being held down
+ *       id of the pressed key, if only a single one was being held down
+ * Returns:
+ * - the number of opened device handles, filled in the *fds output parameter
+ * - 0 if no devices were opened
+ */
 static int openKeyDevices(int *fds, int max_fds, int *pressedKey) {
     char devname[PATH_MAX];
     char *filename;
@@ -75,6 +90,7 @@ static int openKeyDevices(int *fds, int max_fds, int *pressedKey) {
     struct dirent *de;
 
     int count = 0;
+    // No key was detected as pressed, for the moment
     *pressedKey = 0;
 
     dir = opendir(DEVICE_PATH);
@@ -110,6 +126,7 @@ static int openKeyDevices(int *fds, int max_fds, int *pressedKey) {
         }
         if (!reportsKeys) {
             // This device doesn't report any of the relevant keys
+            // Skip to the next one
             close(fd);
             continue;
         }
@@ -121,11 +138,14 @@ static int openKeyDevices(int *fds, int max_fds, int *pressedKey) {
         ioctl(fd, EVIOCGKEY(sizeof(keyBitmask)), keyBitmask);
         for (size_t i = 0; i < sizeof(physical_keycodes) / sizeof(physical_keycodes[0]); i++) {
             if (test_bit(physical_keycodes[i], keyBitmask)) {
+                // One of the relevant keys was detected as held down
+                // We'll report it to be pressed, but only if there isn't more than one key being pressed
                 if (*pressedKey == 0) {
+                    // No key was being pressed, this one will be reported
                     *pressedKey = physical_keycodes[i];
                 } else {
-                    // More than one key is pressed, abort
-                    *pressedKey = 0;
+                    // Another key was already found to be pressed, report multiple keys to the caller
+                    *pressedKey = -1;
                     break;
                 }
             }
@@ -137,6 +157,9 @@ static int openKeyDevices(int *fds, int max_fds, int *pressedKey) {
 }
 
 
+/*
+ * Computes the remaining time, in ms, from the current time to the supplied expiration moment
+ */
 int getRemainingTime(struct timespec expiration) {
     struct timespec now;
     clock_gettime(CLOCK_MONOTONIC, &now);
@@ -165,8 +188,13 @@ bool detectSafemodeTrigger(bool skipInitialDelay) {
         // No input devices found, abort detection
         goto leave;
 
-    if (pressedKey == 0 && skipInitialDelay)
-        // None of the keys was held down and the initial delay is disabled
+    if (pressedKey < 0)
+        // More than one key was initially pressed
+        // Immediately report a negative detection, with no further delays
+        goto leave;
+
+    if (pressedKey <= 0 && skipInitialDelay)
+        // A single key wasn't held down and the initial delay is disabled
         // Immediately report a negative detection, with no further delays
         goto leave;
 
@@ -176,18 +204,15 @@ bool detectSafemodeTrigger(bool skipInitialDelay) {
         goto leave;
 
     // Register each device descriptor in the epoll handle
+    struct epoll_event eventPollItems[MAX_DEVICES];
     for (int i = 0; i < deviceCount; i++) {
-        struct epoll_event eventItem;
-        memset(&eventItem, 0, sizeof(eventItem));
-        eventItem.events = EPOLLIN;
-        eventItem.data.fd = fds[i];
-        if (epoll_ctl(efd, EPOLL_CTL_ADD, fds[i], &eventItem))
+        memset(&eventPollItems[i], 0, sizeof(eventPollItems[i]));
+        eventPollItems[i].events = EPOLLIN;
+        eventPollItems[i].data.fd = fds[i];
+        if (epoll_ctl(efd, EPOLL_CTL_ADD, fds[i], &eventPollItems[i]))
             // Failed to add device descriptor to the epoll handle, abort
             goto leave;
     }
-
-
-    struct epoll_event mEvents[MAX_DEVICES];
 
     int timeout_ms;
     struct timespec expiration;
@@ -196,14 +221,16 @@ bool detectSafemodeTrigger(bool skipInitialDelay) {
 
     // Wait up to INITIAL_DELAY seconds for an initial keypress, it no key was initially down
     while (pressedKey == 0 && (timeout_ms = getRemainingTime(expiration)) > 0) {
-        // Wait for next input event
-        int pollResult = epoll_wait(efd, mEvents, sizeof(mEvents) / sizeof(mEvents[0]), timeout_ms);
+        // Wait for next input event in one of the opened devices
+        int pollResult = epoll_wait(efd, eventPollItems, sizeof(eventPollItems) / sizeof(eventPollItems[0]), timeout_ms);
         if (pollResult < 0)
             // Failed to wait for event, abort
             goto leave;
+
+        // Loop through the opened devices where a new event is available
         for (int i = 0; i < pollResult; i++) {
             struct input_event evt;
-            int32_t readSize = read(mEvents[i].data.fd, &evt, sizeof(evt));
+            int32_t readSize = read(eventPollItems[i].data.fd, &evt, sizeof(evt));
             if (readSize != sizeof(evt))
                 // Invalid size read, ignore
                 continue;
@@ -218,6 +245,8 @@ bool detectSafemodeTrigger(bool skipInitialDelay) {
             for (size_t j = 0; j < sizeof(physical_keycodes) / sizeof(physical_keycodes[0]); j++) {
                 if (evt.code == physical_keycodes[j]) {
                     // One of the keys was pressed, end the initial detection
+                    // No need to check for duplicate keys, as the events are reported sequentially
+                    // and multiple presses can't be reported at once
                     pressedKey = evt.code;
                     break;
                 }
@@ -230,13 +259,12 @@ bool detectSafemodeTrigger(bool skipInitialDelay) {
 
     // Notify the user that the safemode sequence has been started and we're waiting for
     // the remaining key presses
-    vibrate(2, VIBRATION_SHORT, 200);
+    vibrate(2, VIBRATION_SHORT, VIBRATION_SHORT + VIBRATION_INTERVAL);
 
 
     // Detection will wait at most DETECTION_TIMEOUT seconds
     clock_gettime(CLOCK_MONOTONIC, &expiration);
     expiration.tv_sec += DETECTION_TIMEOUT;
-
 
     // Initial key press is counted as well
     triggerPresses++;
@@ -245,13 +273,15 @@ bool detectSafemodeTrigger(bool skipInitialDelay) {
     // be pressed, or the timeout to be reached
     while (pressedKey != 0 && triggerPresses < DETECTION_PRESSES && (timeout_ms = getRemainingTime(expiration)) > 0) {
         // Wait for next input event
-        int pollResult = epoll_wait(efd, mEvents, sizeof(mEvents) / sizeof(mEvents[0]), timeout_ms);
+        int pollResult = epoll_wait(efd, eventPollItems, sizeof(eventPollItems) / sizeof(eventPollItems[0]), timeout_ms);
         if (pollResult < 0)
             // Failed to wait for event, abort
             goto leave;
+
+        // Loop through the opened devices where a new event is available
         for (int i = 0; i < pollResult; i++) {
             struct input_event evt;
-            int32_t readSize = read(mEvents[i].data.fd, &evt, sizeof(evt));
+            int32_t readSize = read(eventPollItems[i].data.fd, &evt, sizeof(evt));
             if (readSize != sizeof(evt))
                 // Invalid size read, ignore
                 continue;
@@ -271,8 +301,9 @@ bool detectSafemodeTrigger(bool skipInitialDelay) {
                         if (triggerPresses < DETECTION_PRESSES)
                             vibrate(1, VIBRATION_SHORT, 0);
                     } else {
-                        // A different key was pressed, abort
-                        pressedKey = 0;
+                        // A key was pressed other than the initial one
+                        // Abort the detection and avoid further delays
+                        goto leave;
                     }
                     break;
                 }
