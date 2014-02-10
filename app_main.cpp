@@ -264,7 +264,7 @@ int main(int argc, char* const argv[])
     }
 
     if (zygote) {
-        if (xposed::detectSafemodeTrigger(xposedSkipSafemodeDelay()))
+        if (!xposedDisableSafemode() && xposed::detectSafemodeTrigger(xposedSkipSafemodeDelay()))
             disableXposed();
     }
 

@@ -107,6 +107,14 @@ bool xposedSkipSafemodeDelay() {
         return false;
 }
 
+bool xposedDisableSafemode() {
+    // is the flag file present?
+    if (access(XPOSED_SAFEMODE_DISABLE, F_OK) == 0)
+        return true;
+    else
+        return false;
+}
+
 
 // ignore the broadcasts by various Superuser implementations to avoid spamming the Xposed log
 bool xposedShouldIgnoreCommand(const char* className, int argc, const char* const argv[]) {

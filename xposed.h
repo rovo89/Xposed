@@ -12,6 +12,7 @@ namespace android {
 #define XPOSED_JAR_NEWVERSION XPOSED_DIR "bin/XposedBridge.jar.newversion"
 #define XPOSED_LOAD_BLOCKER XPOSED_DIR "conf/disabled"
 #define XPOSED_SAFEMODE_NODELAY XPOSED_DIR "conf/safemode_nodelay"
+#define XPOSED_SAFEMODE_DISABLE XPOSED_DIR "conf/safemode_disable"
 #define XPOSED_CLASS "de/robv/android/xposed/XposedBridge"
 #define XPOSED_CLASS_DOTS "de.robv.android.xposed.XposedBridge"
 #define XRESOURCES_CLASS "android/content/res/XResources"
@@ -45,6 +46,7 @@ void xposedEnforceDalvik();
 void disableXposed();
 bool isXposedDisabled();
 bool xposedSkipSafemodeDelay();
+bool xposedDisableSafemode();
 bool xposedShouldIgnoreCommand(const char* className, int argc, const char* const argv[]);
 bool addXposedToClasspath(bool zygote);
 bool xposedOnVmCreated(JNIEnv* env, const char* className);
