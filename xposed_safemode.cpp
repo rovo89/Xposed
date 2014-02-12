@@ -35,7 +35,7 @@
 #define VIBRATOR_CONTROL "/sys/class/timed_output/vibrator/enable"
 #define VIBRATION_SHORT 150
 #define VIBRATION_LONG 500
-#define VIBRATION_INTERVAL 50
+#define VIBRATION_INTERVAL 200
 
 static const char *DEVICE_PATH = "/dev/input";
 #define MAX_DEVICES 4
@@ -193,7 +193,7 @@ bool detectSafemodeTrigger(bool skipInitialDelay) {
         // Immediately report a negative detection, with no further delays
         goto leave;
 
-    if (pressedKey <= 0 && skipInitialDelay)
+    if (pressedKey == 0 && skipInitialDelay)
         // A single key wasn't held down and the initial delay is disabled
         // Immediately report a negative detection, with no further delays
         goto leave;
@@ -259,7 +259,7 @@ bool detectSafemodeTrigger(bool skipInitialDelay) {
 
     // Notify the user that the safemode sequence has been started and we're waiting for
     // the remaining key presses
-    vibrate(2, VIBRATION_SHORT, VIBRATION_SHORT + VIBRATION_INTERVAL);
+    vibrate(2, VIBRATION_SHORT, VIBRATION_INTERVAL);
 
 
     // Detection will wait at most DETECTION_TIMEOUT seconds
@@ -271,7 +271,7 @@ bool detectSafemodeTrigger(bool skipInitialDelay) {
 
     // Loop waiting for the same key to be pressed the appropriate number of times, a different key to
     // be pressed, or the timeout to be reached
-    while (pressedKey != 0 && triggerPresses < DETECTION_PRESSES && (timeout_ms = getRemainingTime(expiration)) > 0) {
+    while (triggerPresses < DETECTION_PRESSES && (timeout_ms = getRemainingTime(expiration)) > 0) {
         // Wait for next input event
         int pollResult = epoll_wait(efd, eventPollItems, sizeof(eventPollItems) / sizeof(eventPollItems[0]), timeout_ms);
         if (pollResult < 0)
@@ -298,6 +298,7 @@ bool detectSafemodeTrigger(bool skipInitialDelay) {
                     if (pressedKey == evt.code) {
                         // The same key was pressed again, increment the counter and notify the user
                         triggerPresses++;
+                        // The final key press will be confirmed with a long vibration later
                         if (triggerPresses < DETECTION_PRESSES)
                             vibrate(1, VIBRATION_SHORT, 0);
                     } else {
@@ -312,7 +313,7 @@ bool detectSafemodeTrigger(bool skipInitialDelay) {
     }
 
     // Was safemode successfully triggered?
-    if (pressedKey != 0 && triggerPresses == DETECTION_PRESSES) {
+    if (triggerPresses >= DETECTION_PRESSES) {
         vibrate(1, VIBRATION_LONG, 0);
         result = true;
     }
