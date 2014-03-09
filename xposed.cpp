@@ -20,6 +20,9 @@
 #include <stdio.h>
 #include <sys/mman.h>
 #include <cutils/properties.h>
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <fcntl.h>
 #include <dlfcn.h>
 
 #include "xposed_offsets.h"
@@ -80,6 +83,13 @@ void xposedEnforceDalvik() {
     }
 }
 
+void disableXposed() {
+    int fd;
+    fd = open(XPOSED_LOAD_BLOCKER, O_WRONLY | O_CREAT, S_IRUSR | S_IWUSR);
+    if (fd >= 0)
+        close(fd);
+}
+
 bool isXposedDisabled() {
     // is the blocker file present?
     if (access(XPOSED_LOAD_BLOCKER, F_OK) == 0) {
@@ -88,6 +98,23 @@ bool isXposedDisabled() {
     }
     return false;
 }
+
+bool xposedSkipSafemodeDelay() {
+    // is the flag file present?
+    if (access(XPOSED_SAFEMODE_NODELAY, F_OK) == 0)
+        return true;
+    else
+        return false;
+}
+
+bool xposedDisableSafemode() {
+    // is the flag file present?
+    if (access(XPOSED_SAFEMODE_DISABLE, F_OK) == 0)
+        return true;
+    else
+        return false;
+}
+
 
 // ignore the broadcasts by various Superuser implementations to avoid spamming the Xposed log
 bool xposedShouldIgnoreCommand(const char* className, int argc, const char* const argv[]) {
