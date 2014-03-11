@@ -59,16 +59,19 @@ void xposedInfo() {
     char manufacturer[PROPERTY_VALUE_MAX];
     char model[PROPERTY_VALUE_MAX];
     char rom[PROPERTY_VALUE_MAX];
+    char fingerprint[PROPERTY_VALUE_MAX];
     
     property_get("ro.build.version.release", release, "n/a");
     property_get("ro.build.version.sdk", sdk, "n/a");
     property_get("ro.product.manufacturer", manufacturer, "n/a");
     property_get("ro.product.model", model, "n/a");
     property_get("ro.build.display.id", rom, "n/a");
+    property_get("ro.build.fingerprint", fingerprint, "n/a");
     
     ALOGD("Starting Xposed binary version %s, compiled for SDK %d\n", XPOSED_VERSION, PLATFORM_SDK_VERSION);
     ALOGD("Phone: %s (%s), Android version %s (SDK %s)\n", model, manufacturer, release, sdk);
     ALOGD("ROM: %s\n", rom);
+    ALOGD("Build fingerprint: %s\n", fingerprint);
 }
 
 void xposedEnforceDalvik() {
