@@ -181,6 +181,99 @@ bool addXposedToClasspath(bool zygote) {
 }
 
 
+enum XposedMakePublicType {
+    XPOSED_MAKE_PUBLIC_CLASS,
+    XPOSED_MAKE_PUBLIC_VIRTUAL_METHOD,
+    XPOSED_MAKE_PUBLIC_DIRECT_METHOD,
+    XPOSED_MAKE_PUBLIC_INSTANCE_FIELD,
+    //XPOSED_MAKE_PUBLIC_STATIC_FIELD,
+};
+
+struct XposedMakePublicObject {
+    const char* className;
+    const enum XposedMakePublicType type;
+    const char* name;
+    const char* signature;
+};
+
+static const struct XposedMakePublicObject xposedMakePublicList[] = {
+    { "android/app/ActivityThread", XPOSED_MAKE_PUBLIC_INSTANCE_FIELD, "mBoundApplication", "Landroid/app/ActivityThread$AppBindData;" },
+    { "android/app/ActivityThread", XPOSED_MAKE_PUBLIC_INSTANCE_FIELD, "mConfiguration", "Landroid/content/res/Configuration;" },
+    { "android/app/ActivityThread$AppBindData", XPOSED_MAKE_PUBLIC_CLASS, NULL, NULL },
+    { "android/app/ActivityThread$AppBindData", XPOSED_MAKE_PUBLIC_INSTANCE_FIELD, "appInfo", "Landroid/content/pm/ApplicationInfo;" },
+    { "android/content/res/Resources", XPOSED_MAKE_PUBLIC_VIRTUAL_METHOD, "loadXmlResourceParser", "(ILjava/lang/String;)Landroid/content/res/XmlResourceParser;" },
+    { "android/content/res/Resources", XPOSED_MAKE_PUBLIC_INSTANCE_FIELD, "mTmpValue", "Landroid/util/TypedValue;" },
+    { "android/content/res/TypedArray", XPOSED_MAKE_PUBLIC_DIRECT_METHOD, "<init>", "(Landroid/content/res/Resources;[I[II)V" },
+    { "android/content/res/TypedArray", XPOSED_MAKE_PUBLIC_INSTANCE_FIELD, "mData", "[I" },
+    { "android/content/res/TypedArray", XPOSED_MAKE_PUBLIC_INSTANCE_FIELD, "mIndices", "[I" },
+    { "android/content/res/TypedArray", XPOSED_MAKE_PUBLIC_INSTANCE_FIELD, "mLength", "I" },
+    { "android/content/res/XmlBlock$Parser", XPOSED_MAKE_PUBLIC_CLASS, NULL, NULL },
+    { "android/content/res/XmlBlock$Parser", XPOSED_MAKE_PUBLIC_INSTANCE_FIELD, "mParseState", "I" },
+    { NULL, XPOSED_MAKE_PUBLIC_CLASS, NULL, NULL },
+};
+
+static bool xposedMakeClassesPublic(JNIEnv* env, const XposedMakePublicObject* list) {
+    const bool LOG_MISSING_OBJECTS = true;
+    ClassObject* clz = NULL;
+    Method* meth;
+    InstField* ifield;
+    const char* lastClassName = "";
+
+    for (const XposedMakePublicObject* obj = list; obj->className != NULL; obj++) {
+        // load class if not done yet
+        if (strcmp(obj->className, lastClassName) != 0) {
+            lastClassName = obj->className;
+            jclass jclz = env->FindClass(obj->className);
+            if (jclz != NULL) {
+                clz = (ClassObject*) dvmDecodeIndirectRef(dvmThreadSelf(), jclz);
+            } else {
+                if (LOG_MISSING_OBJECTS) ALOGE("Could not find class %s", obj->className);
+                clz = NULL;
+                env->ExceptionClear();
+                continue;
+            }
+        } else if (clz == NULL) {
+            continue;
+        }
+
+        // make class/method/field public
+        // not using switch here because it generates undefined references to __gnu_thumb1_case_uqi
+        if (obj->type == XPOSED_MAKE_PUBLIC_CLASS) {
+            SET_CLASS_FLAG(clz, ACC_PUBLIC);
+
+        } else if (obj->type == XPOSED_MAKE_PUBLIC_VIRTUAL_METHOD) {
+            meth = dvmFindVirtualMethodHierByDescriptor(clz, obj->name, obj->signature);
+            if (meth == NULL) {
+                if (LOG_MISSING_OBJECTS) ALOGE("Could not find virtual method %s:%s in class %s", obj->name, obj->signature, obj->className);
+                env->ExceptionClear();
+                continue;
+            }
+            SET_METHOD_FLAG(meth, ACC_PUBLIC);
+
+        } else if (obj->type == XPOSED_MAKE_PUBLIC_DIRECT_METHOD) {
+            meth = dvmFindDirectMethodByDescriptor(clz, obj->name, obj->signature);
+            if (meth == NULL) {
+                if (LOG_MISSING_OBJECTS) ALOGE("Could not find direct method %s:%s in class %s", obj->name, obj->signature, obj->className);
+                env->ExceptionClear();
+                continue;
+            }
+            SET_METHOD_FLAG(meth, ACC_PUBLIC);
+
+        } else if (obj->type == XPOSED_MAKE_PUBLIC_INSTANCE_FIELD) {
+            ifield = dvmFindInstanceFieldHier(clz, obj->name, obj->signature);
+            if (ifield == NULL) {
+                if (LOG_MISSING_OBJECTS) ALOGE("Could not find instance field %s:%s in class %s", obj->name, obj->signature, obj->className);
+                env->ExceptionClear();
+                continue;
+            }
+            ifield->accessFlags |= ACC_PUBLIC;
+        }
+    }
+
+    return true;
+}
+
+
 bool xposedOnVmCreated(JNIEnv* env, const char* className) {
     startClassName = className;
 
@@ -188,12 +281,7 @@ bool xposedOnVmCreated(JNIEnv* env, const char* className) {
     if (!keepLoadingXposed)
         return false;
 
-    // disable some access checks
-    patchReturnTrue((uintptr_t) &dvmCheckClassAccess);
-    patchReturnTrue((uintptr_t) &dvmCheckFieldAccess);
-    patchReturnTrue((uintptr_t) &dvmInSamePackage);
-    if (access(XPOSED_DIR "conf/do_not_hook_dvmCheckMethodAccess", F_OK) != 0)
-        patchReturnTrue((uintptr_t) &dvmCheckMethodAccess);
+    xposedMakeClassesPublic(env, xposedMakePublicList);
 
     jclass miuiResourcesClass = env->FindClass(MIUI_RESOURCES_CLASS);
     if (miuiResourcesClass != NULL) {
@@ -358,37 +446,6 @@ static void xposedCallHandler(const u4* args, JValue* pResult, const Method* met
             dvmThrowClassCastException(result.l->clazz, returnType);
         }
     }
-}
-
-
-static void replaceAsm(uintptr_t function, unsigned const char* newCode, size_t len) {
-#ifdef __arm__
-    function = function & ~1;
-#endif
-    uintptr_t pageStart = function & ~(PAGESIZE-1);
-    size_t pageProtectSize = PAGESIZE;
-    if (function+len > pageStart+pageProtectSize)
-        pageProtectSize += PAGESIZE;
-
-    mprotect((void*)pageStart, pageProtectSize, PROT_READ | PROT_WRITE | PROT_EXEC);
-    memcpy((void*)function, newCode, len);
-    mprotect((void*)pageStart, pageProtectSize, PROT_READ | PROT_EXEC);
-
-    __clear_cache((void*)function, (void*)(function+len));
-}
-
-static void patchReturnTrue(uintptr_t function) {
-#ifdef __arm__
-    unsigned const char asmReturnTrueThumb[] = { 0x01, 0x20, 0x70, 0x47 };
-    unsigned const char asmReturnTrueArm[] = { 0x01, 0x00, 0xA0, 0xE3, 0x1E, 0xFF, 0x2F, 0xE1 };
-    if (function & 1)
-        replaceAsm(function, asmReturnTrueThumb, sizeof(asmReturnTrueThumb));
-    else
-        replaceAsm(function, asmReturnTrueArm, sizeof(asmReturnTrueArm));
-#else
-    unsigned const char asmReturnTrueX86[] = { 0x31, 0xC0, 0x40, 0xC3 };
-    replaceAsm(function, asmReturnTrueX86, sizeof(asmReturnTrueX86));
-#endif
 }
 
 
