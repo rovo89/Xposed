@@ -203,10 +203,6 @@ static const struct XposedMakePublicObject xposedMakePublicList[] = {
     { "android/app/ActivityThread$AppBindData", XPOSED_MAKE_PUBLIC_INSTANCE_FIELD, "appInfo", "Landroid/content/pm/ApplicationInfo;" },
     { "android/content/res/Resources", XPOSED_MAKE_PUBLIC_VIRTUAL_METHOD, "loadXmlResourceParser", "(ILjava/lang/String;)Landroid/content/res/XmlResourceParser;" },
     { "android/content/res/Resources", XPOSED_MAKE_PUBLIC_INSTANCE_FIELD, "mTmpValue", "Landroid/util/TypedValue;" },
-    { "android/content/res/TypedArray", XPOSED_MAKE_PUBLIC_DIRECT_METHOD, "<init>", "(Landroid/content/res/Resources;[I[II)V" },
-    { "android/content/res/TypedArray", XPOSED_MAKE_PUBLIC_INSTANCE_FIELD, "mData", "[I" },
-    { "android/content/res/TypedArray", XPOSED_MAKE_PUBLIC_INSTANCE_FIELD, "mIndices", "[I" },
-    { "android/content/res/TypedArray", XPOSED_MAKE_PUBLIC_INSTANCE_FIELD, "mLength", "I" },
     { "android/content/res/XmlBlock$Parser", XPOSED_MAKE_PUBLIC_CLASS, NULL, NULL },
     { "android/content/res/XmlBlock$Parser", XPOSED_MAKE_PUBLIC_INSTANCE_FIELD, "mParseState", "I" },
     { NULL, XPOSED_MAKE_PUBLIC_CLASS, NULL, NULL },
@@ -274,6 +270,14 @@ static bool xposedMakeClassesPublic(JNIEnv* env, const XposedMakePublicObject* l
 }
 
 
+static void xposedPrepareSubclassReplacement(jclass clazz) {
+    // clazz is supposed to replace its superclass, so make sure enough memory is allocated
+    ClassObject* sub = (ClassObject*) dvmDecodeIndirectRef(dvmThreadSelf(), clazz);
+    ClassObject* super = sub->super;
+    super->objectSize = sub->objectSize;
+}
+
+
 bool xposedOnVmCreated(JNIEnv* env, const char* className) {
     startClassName = className;
 
@@ -292,6 +296,16 @@ bool xposedOnVmCreated(JNIEnv* env, const char* className) {
         }
     }
     env->ExceptionClear();
+
+    jclass xTypedArrayClass = env->FindClass(XTYPEDARRAY_CLASS);
+    if (xTypedArrayClass == NULL) {
+        ALOGE("Error while loading XTypedArray class '%s':\n", XTYPEDARRAY_CLASS);
+        dvmLogExceptionStackTrace();
+        env->ExceptionClear();
+        keepLoadingXposed = false;
+        return false;
+    }
+    xposedPrepareSubclassReplacement(xTypedArrayClass);
 
     xposedClass = env->FindClass(XPOSED_CLASS);
     xposedClass = reinterpret_cast<jclass>(env->NewGlobalRef(xposedClass));
@@ -664,10 +678,17 @@ static jobject de_robv_android_xposed_XposedBridge_getStartClassName(JNIEnv* env
     return env->NewStringUTF(startClassName);
 }
 
+static void de_robv_android_xposed_XposedBridge_setObjectClassNative(JNIEnv* env, jclass clazz, jobject objIndirect, jclass clzIndirect) {
+    Object* obj = (Object*) dvmDecodeIndirectRef(dvmThreadSelf(), objIndirect);
+    ClassObject* clz = (ClassObject*) dvmDecodeIndirectRef(dvmThreadSelf(), clzIndirect);
+    obj->clazz = clz;
+}
+
 static const JNINativeMethod xposedMethods[] = {
     {"getStartClassName", "()Ljava/lang/String;", (void*)de_robv_android_xposed_XposedBridge_getStartClassName},
     {"initNative", "()Z", (void*)de_robv_android_xposed_XposedBridge_initNative},
     {"hookMethodNative", "(Ljava/lang/reflect/Member;Ljava/lang/Class;ILjava/lang/Object;)V", (void*)de_robv_android_xposed_XposedBridge_hookMethodNative},
+    {"setObjectClassNative", "(Ljava/lang/Object;Ljava/lang/Class;)V", (void*)de_robv_android_xposed_XposedBridge_setObjectClassNative},
 };
 
 static const JNINativeMethod xresourcesMethods[] = {
