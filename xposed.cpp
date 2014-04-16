@@ -684,11 +684,17 @@ static void de_robv_android_xposed_XposedBridge_setObjectClassNative(JNIEnv* env
     obj->clazz = clz;
 }
 
+static void de_robv_android_xposed_XposedBridge_dumpObjectNative(JNIEnv* env, jclass clazz, jobject objIndirect) {
+    Object* obj = (Object*) dvmDecodeIndirectRef(dvmThreadSelf(), objIndirect);
+    dvmDumpObject(obj);
+}
+
 static const JNINativeMethod xposedMethods[] = {
     {"getStartClassName", "()Ljava/lang/String;", (void*)de_robv_android_xposed_XposedBridge_getStartClassName},
     {"initNative", "()Z", (void*)de_robv_android_xposed_XposedBridge_initNative},
     {"hookMethodNative", "(Ljava/lang/reflect/Member;Ljava/lang/Class;ILjava/lang/Object;)V", (void*)de_robv_android_xposed_XposedBridge_hookMethodNative},
     {"setObjectClassNative", "(Ljava/lang/Object;Ljava/lang/Class;)V", (void*)de_robv_android_xposed_XposedBridge_setObjectClassNative},
+    {"dumpObjectNative", "(Ljava/lang/Object;)V", (void*)de_robv_android_xposed_XposedBridge_dumpObjectNative},
 };
 
 static const JNINativeMethod xresourcesMethods[] = {

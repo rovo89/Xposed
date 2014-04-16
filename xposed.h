@@ -20,7 +20,7 @@ namespace android {
 #define MIUI_RESOURCES_CLASS "android/content/res/MiuiResources"
 #define XTYPEDARRAY_CLASS "android/content/res/XResources$XTypedArray"
 
-#define XPOSED_VERSION "52"
+#define XPOSED_VERSION "53"
 
 #ifndef ALOGD
 #define ALOGD LOGD
