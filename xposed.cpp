@@ -689,12 +689,32 @@ static void de_robv_android_xposed_XposedBridge_dumpObjectNative(JNIEnv* env, jc
     dvmDumpObject(obj);
 }
 
+static jobject de_robv_android_xposed_XposedBridge_cloneToSubclassNative(JNIEnv* env, jclass clazz, jobject objIndirect, jclass clzIndirect) {
+    Object* obj = (Object*) dvmDecodeIndirectRef(dvmThreadSelf(), objIndirect);
+    ClassObject* clz = (ClassObject*) dvmDecodeIndirectRef(dvmThreadSelf(), clzIndirect);
+
+    jobject copyIndirect = env->AllocObject(clzIndirect);
+    if (copyIndirect == NULL)
+        return NULL;
+
+    Object* copy = (Object*) dvmDecodeIndirectRef(dvmThreadSelf(), copyIndirect);
+    size_t size = obj->clazz->objectSize;
+    size_t offset = sizeof(Object);
+    memcpy((char*)copy + offset, (char*)obj + offset, size - offset);
+
+    if (IS_CLASS_FLAG_SET(clz, CLASS_ISFINALIZABLE))
+        dvmSetFinalizable(copy);
+
+    return copyIndirect;
+}
+
 static const JNINativeMethod xposedMethods[] = {
     {"getStartClassName", "()Ljava/lang/String;", (void*)de_robv_android_xposed_XposedBridge_getStartClassName},
     {"initNative", "()Z", (void*)de_robv_android_xposed_XposedBridge_initNative},
     {"hookMethodNative", "(Ljava/lang/reflect/Member;Ljava/lang/Class;ILjava/lang/Object;)V", (void*)de_robv_android_xposed_XposedBridge_hookMethodNative},
     {"setObjectClassNative", "(Ljava/lang/Object;Ljava/lang/Class;)V", (void*)de_robv_android_xposed_XposedBridge_setObjectClassNative},
     {"dumpObjectNative", "(Ljava/lang/Object;)V", (void*)de_robv_android_xposed_XposedBridge_dumpObjectNative},
+    {"cloneToSubclassNative", "(Ljava/lang/Object;Ljava/lang/Class;)Ljava/lang/Object;", (void*)de_robv_android_xposed_XposedBridge_cloneToSubclassNative},
 };
 
 static const JNINativeMethod xresourcesMethods[] = {
