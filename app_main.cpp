@@ -1,4 +1,21 @@
 /*
+ * Copyright 2007, The Android Open Source Project
+ * Modified work Copyright (c) 2013, rovo89 and Tungstwenty
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+/*
  * Main entry of app process.
  *
  * Starts the interpreted runtime, then starts up the application.
@@ -7,27 +24,20 @@
 
 #define LOG_TAG "appproc"
 
+#include <cutils/properties.h>
 #include <binder/IPCThreadState.h>
 #include <binder/ProcessState.h>
 #include <utils/Log.h>
 #include <cutils/process_name.h>
 #include <cutils/memory.h>
-#include <cutils/properties.h>
+#include <cutils/trace.h>
 #include <android_runtime/AndroidRuntime.h>
-#include <dlfcn.h>
-
-#if PLATFORM_SDK_VERSION >= 16
 #include <sys/personality.h>
-#endif
 
+#include <stdlib.h>
 #include <stdio.h>
 #include <unistd.h>
-#include "xposed.h"
-#include "xposed_safemode.h"
-
-int RUNNING_PLATFORM_SDK_VERSION = 0;
-void (*PTR_atrace_set_tracing_enabled)(bool) = NULL;
-
+#include "dexspy.h"
 
 namespace android {
 
@@ -35,25 +45,7 @@ void app_usage()
 {
     fprintf(stderr,
         "Usage: app_process [java-options] cmd-dir start-class-name [options]\n");
-    fprintf(stderr, "   with Xposed support (version " XPOSED_VERSION ")\n");
-}
-
-void initTypePointers()
-{
-    char sdk[PROPERTY_VALUE_MAX];
-    const char *error;
-
-    property_get("ro.build.version.sdk", sdk, "0");
-    RUNNING_PLATFORM_SDK_VERSION = atoi(sdk);
-
-    dlerror();
-
-    if (RUNNING_PLATFORM_SDK_VERSION >= 18) {
-        *(void **) (&PTR_atrace_set_tracing_enabled) = dlsym(RTLD_DEFAULT, "atrace_set_tracing_enabled");
-        if ((error = dlerror()) != NULL) {
-            ALOGE("Could not find address for function atrace_set_tracing_enabled: %s", error);
-        }
-    }
+    fprintf(stderr, "   with Dexspy support (version " DEXSPY_VERSION ")\n");
 }
 
 class AppRuntime : public AndroidRuntime
@@ -83,7 +75,7 @@ public:
 
     virtual void onVmCreated(JNIEnv* env)
     {
-        keepLoadingXposed = xposedOnVmCreated(env, mClassName);
+        keepLoadingDexspy = dexspyOnVmCreated(env, mClassName);
 
         if (mClassName == NULL) {
             return; // Zygote. Nothing to do here.
@@ -126,10 +118,8 @@ public:
 
     virtual void onZygoteInit()
     {
-        if (PTR_atrace_set_tracing_enabled != NULL) {
-            // Re-enable tracing now that we're no longer in Zygote.
-            PTR_atrace_set_tracing_enabled(true);
-        }
+        // Re-enable tracing now that we're no longer in Zygote.
+        atrace_set_tracing_enabled(true);
 
         sp<ProcessState> proc = ProcessState::self();
         ALOGV("App process: starting thread pool.\n");
@@ -168,23 +158,6 @@ static void setArgv0(const char *argv0, const char *newArgv0)
 
 int main(int argc, char* const argv[])
 {
-    if (argc == 2 && strcmp(argv[1], "--xposedversion") == 0) {
-        printf("Xposed version: " XPOSED_VERSION "\n");
-        return 0;
-    }
-
-    if (argc == 2 && strcmp(argv[1], "--xposedtestsafemode") == 0) {
-        printf("Testing Xposed safemode trigger\n");
-
-        if (xposed::detectSafemodeTrigger(xposedSkipSafemodeDelay())) {
-            printf("Safemode triggered\n");
-        } else {
-            printf("Safemode not triggered\n");
-        }
-        return 0;
-    }
-
-#if PLATFORM_SDK_VERSION >= 16
 #ifdef __arm__
     /*
      * b/7188322 - Temporarily revert to the compat memory layout
@@ -211,9 +184,11 @@ int main(int argc, char* const argv[])
     }
     unsetenv("NO_ADDR_COMPAT_LAYOUT_FIXUP");
 #endif
-#endif
 
-    initTypePointers();
+    if (argc == 2 && strcmp(argv[1], "--dexspyversion") == 0) {
+        printf("Dexspy version: " DEXSPY_VERSION "\n");
+        return 0;
+    }
 
     // These are global variables in ProcessState.cpp
     mArgC = argc;
@@ -263,31 +238,39 @@ int main(int argc, char* const argv[])
         }
     }
 
-    if (zygote) {
-        if (!xposedDisableSafemode() && xposed::detectSafemodeTrigger(xposedSkipSafemodeDelay()))
-            disableXposed();
-    }
-
     if (niceName && *niceName) {
         setArgv0(argv0, niceName);
         set_process_name(niceName);
     }
 
     runtime.mParentDir = parentDir;
-    
-    xposedInfo();
-    xposedEnforceDalvik();
-    keepLoadingXposed = !isXposedDisabled() && !xposedShouldIgnoreCommand(className, argc, argv) && addXposedToClasspath(zygote);
+
+    dexspyInfo();
+    keepLoadingDexspy = !isDexspyDisabled() && !dexspyShouldIgnoreCommand(className, argc, argv) && addDexspyToClasspath(zygote);
 
     if (zygote) {
-        runtime.start(keepLoadingXposed ? XPOSED_CLASS_DOTS : "com.android.internal.os.ZygoteInit",
+        // check if lcd_density property is set.
+        // if it is not set within the ~5 second timeout, fail initialization.
+        for (i = 0; i < 50; i++) {
+            property_get("ro.sf.lcd_density", value, "");
+            if (strcmp(value, "") == 0) {
+                if (i < 49) {
+                    usleep(100000);
+                } else {
+                    LOG_ALWAYS_FATAL("app_process: ro.sf.lcd_density not set.");
+                }
+            } else {
+                break;
+            }
+        }
+        runtime.start(keepLoadingDexspy ? DEXSPY_CLASS_DOTS : "com.android.internal.os.ZygoteInit",
                 startSystemServer ? "start-system-server" : "");
     } else if (className) {
         // Remainder of args get passed to startup class main()
         runtime.mClassName = className;
         runtime.mArgC = argc - i;
         runtime.mArgV = argv + i;
-        runtime.start(keepLoadingXposed ? XPOSED_CLASS_DOTS : "com.android.internal.os.RuntimeInit",
+        runtime.start(keepLoadingDexspy ? DEXSPY_CLASS_DOTS : "com.android.internal.os.RuntimeInit",
                 application ? "application" : "tool");
     } else {
         fprintf(stderr, "Error: no class name or --zygote supplied.\n");
