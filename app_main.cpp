@@ -275,9 +275,13 @@ int main(int argc, char* const argv[])
 
     runtime.mParentDir = parentDir;
     
-    xposedInfo();
-    xposedEnforceDalvik();
-    keepLoadingXposed = !isXposedDisabled() && !xposedShouldIgnoreCommand(className, argc, argv) && addXposedToClasspath(zygote);
+    if (zygote || access(XPOSED_ENABLE_FOR_TOOLS, F_OK) == 0) {
+        xposedInfo();
+        xposedEnforceDalvik();
+        keepLoadingXposed = !isXposedDisabled() && !xposedShouldIgnoreCommand(className, argc, argv) && addXposedToClasspath(zygote);
+    } else {
+        keepLoadingXposed = false;
+    }
 
     if (zygote) {
         runtime.start(keepLoadingXposed ? XPOSED_CLASS_DOTS : "com.android.internal.os.ZygoteInit",

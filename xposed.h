@@ -11,6 +11,7 @@ namespace android {
 #define XPOSED_JAR XPOSED_DIR "bin/XposedBridge.jar"
 #define XPOSED_JAR_NEWVERSION XPOSED_DIR "bin/XposedBridge.jar.newversion"
 #define XPOSED_LOAD_BLOCKER XPOSED_DIR "conf/disabled"
+#define XPOSED_ENABLE_FOR_TOOLS XPOSED_DIR "conf/enable_for_tools"
 #define XPOSED_SAFEMODE_NODELAY XPOSED_DIR "conf/safemode_nodelay"
 #define XPOSED_SAFEMODE_DISABLE XPOSED_DIR "conf/safemode_disable"
 
@@ -20,7 +21,7 @@ namespace android {
 #define MIUI_RESOURCES_CLASS "android/content/res/MiuiResources"
 #define XTYPEDARRAY_CLASS "android/content/res/XResources$XTypedArray"
 
-#define XPOSED_VERSION "54"
+#define XPOSED_VERSION "55"
 
 #ifndef ALOGD
 #define ALOGD LOGD
