@@ -302,7 +302,6 @@ bool xposedOnVmCreated(JNIEnv* env, const char* className) {
         ALOGE("Error while loading XTypedArray class '%s':\n", XTYPEDARRAY_CLASS);
         dvmLogExceptionStackTrace();
         env->ExceptionClear();
-        keepLoadingXposed = false;
         return false;
     }
     xposedPrepareSubclassReplacement(xTypedArrayClass);
@@ -320,6 +319,7 @@ bool xposedOnVmCreated(JNIEnv* env, const char* className) {
     ALOGI("Found Xposed class '%s', now initializing\n", XPOSED_CLASS);
     if (register_de_robv_android_xposed_XposedBridge(env) != JNI_OK) {
         ALOGE("Could not register natives for '%s'\n", XPOSED_CLASS);
+        env->ExceptionClear();
         return false;
     }
     return true;
@@ -517,6 +517,8 @@ static jboolean de_robv_android_xposed_XposedBridge_initNative(JNIEnv* env, jcla
     }
     if (register_android_content_res_XResources(env) != JNI_OK) {
         ALOGE("Could not register natives for '%s'\n", XRESOURCES_CLASS);
+        env->ExceptionClear();
+        keepLoadingXposed = false;
         return false;
     }
 
