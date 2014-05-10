@@ -118,6 +118,17 @@ bool xposedDisableSafemode() {
         return false;
 }
 
+static int xposedReadIntConfig(const char* fileName, int defaultValue) {
+    FILE *fp = fopen(fileName, "r");
+    if (fp == NULL)
+        return defaultValue;
+
+    int result;
+    int success = fscanf(fp, "%i", &result);
+    fclose(fp);
+
+    return (success >= 1) ? result : defaultValue;
+}
 
 // ignore the broadcasts by various Superuser implementations to avoid spamming the Xposed log
 bool xposedShouldIgnoreCommand(const char* className, int argc, const char* const argv[]) {
@@ -245,6 +256,12 @@ static bool xposedInitMemberOffsets(JNIEnv* env) {
     ALOGD("Using structure member offsets for mode %s", xposedOffsetModesDesc[offsetMode]);
 
     MEMBER_OFFSET_COPY(DvmJitGlobals, codeCacheFull);
+
+    int overrideCodeCacheFull = xposedReadIntConfig(XPOSED_OVERRIDE_JIT_RESET_OFFSET, -1);
+    if (overrideCodeCacheFull > 0 && overrideCodeCacheFull < 0x400) {
+        ALOGI("Offset for DvmJitGlobals.codeCacheFull is overridden, new value is 0x%x", overrideCodeCacheFull);
+        MEMBER_OFFSET_VAR(DvmJitGlobals, codeCacheFull) = overrideCodeCacheFull;
+    }
 
     // detect offset of ArrayObject->contents
     jintArray dummyArray = env->NewIntArray(1);
@@ -489,7 +506,12 @@ static void de_robv_android_xposed_XposedBridge_hookMethodNative(JNIEnv* env, jc
 
     if (PTR_gDvmJit != NULL) {
         // reset JIT cache
-        MEMBER_VAL(PTR_gDvmJit, DvmJitGlobals, codeCacheFull) = true;
+        char currentValue = *((char*)PTR_gDvmJit + MEMBER_OFFSET_VAR(DvmJitGlobals,codeCacheFull));
+        if (currentValue == 0 || currentValue == 1) {
+            MEMBER_VAL(PTR_gDvmJit, DvmJitGlobals, codeCacheFull) = true;
+        } else {
+            ALOGE("Unexpected current value for codeCacheFull: %d", currentValue);
+        }
     }
 }
 

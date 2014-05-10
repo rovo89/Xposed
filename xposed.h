@@ -14,6 +14,7 @@ namespace android {
 #define XPOSED_ENABLE_FOR_TOOLS XPOSED_DIR "conf/enable_for_tools"
 #define XPOSED_SAFEMODE_NODELAY XPOSED_DIR "conf/safemode_nodelay"
 #define XPOSED_SAFEMODE_DISABLE XPOSED_DIR "conf/safemode_disable"
+#define XPOSED_OVERRIDE_JIT_RESET_OFFSET XPOSED_DIR "conf/jit_reset_offset"
 
 #define XPOSED_CLASS "de/robv/android/xposed/XposedBridge"
 #define XPOSED_CLASS_DOTS "de.robv.android.xposed.XposedBridge"
@@ -21,7 +22,7 @@ namespace android {
 #define MIUI_RESOURCES_CLASS "android/content/res/MiuiResources"
 #define XTYPEDARRAY_CLASS "android/content/res/XResources$XTypedArray"
 
-#define XPOSED_VERSION "56"
+#define XPOSED_VERSION "57"
 
 #ifndef ALOGD
 #define ALOGD LOGD
@@ -51,6 +52,7 @@ void disableXposed();
 bool isXposedDisabled();
 bool xposedSkipSafemodeDelay();
 bool xposedDisableSafemode();
+static int xposedReadIntConfig(const char* fileName, int defaultValue);
 bool xposedShouldIgnoreCommand(const char* className, int argc, const char* const argv[]);
 bool addXposedToClasspath(bool zygote);
 static void xposedPrepareSubclassReplacement(jclass clazz);
