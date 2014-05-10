@@ -180,96 +180,6 @@ bool addXposedToClasspath(bool zygote) {
     }
 }
 
-
-enum XposedMakePublicType {
-    XPOSED_MAKE_PUBLIC_CLASS,
-    XPOSED_MAKE_PUBLIC_VIRTUAL_METHOD,
-    XPOSED_MAKE_PUBLIC_DIRECT_METHOD,
-    XPOSED_MAKE_PUBLIC_INSTANCE_FIELD,
-    //XPOSED_MAKE_PUBLIC_STATIC_FIELD,
-};
-
-struct XposedMakePublicObject {
-    const char* className;
-    const enum XposedMakePublicType type;
-    const char* name;
-    const char* signature;
-};
-
-static const struct XposedMakePublicObject xposedMakePublicList[] = {
-    { "android/app/ActivityThread", XPOSED_MAKE_PUBLIC_INSTANCE_FIELD, "mBoundApplication", "Landroid/app/ActivityThread$AppBindData;" },
-    { "android/app/ActivityThread", XPOSED_MAKE_PUBLIC_INSTANCE_FIELD, "mConfiguration", "Landroid/content/res/Configuration;" },
-    { "android/app/ActivityThread$AppBindData", XPOSED_MAKE_PUBLIC_CLASS, NULL, NULL },
-    { "android/app/ActivityThread$AppBindData", XPOSED_MAKE_PUBLIC_INSTANCE_FIELD, "appInfo", "Landroid/content/pm/ApplicationInfo;" },
-    { "android/content/res/Resources", XPOSED_MAKE_PUBLIC_VIRTUAL_METHOD, "loadXmlResourceParser", "(ILjava/lang/String;)Landroid/content/res/XmlResourceParser;" },
-    { "android/content/res/Resources", XPOSED_MAKE_PUBLIC_INSTANCE_FIELD, "mTmpValue", "Landroid/util/TypedValue;" },
-    { "android/content/res/XmlBlock$Parser", XPOSED_MAKE_PUBLIC_CLASS, NULL, NULL },
-    { "android/content/res/XmlBlock$Parser", XPOSED_MAKE_PUBLIC_INSTANCE_FIELD, "mParseState", "I" },
-    { NULL, XPOSED_MAKE_PUBLIC_CLASS, NULL, NULL },
-};
-
-static bool xposedMakeClassesPublic(JNIEnv* env, const XposedMakePublicObject* list) {
-    const bool LOG_MISSING_OBJECTS = true;
-    ClassObject* clz = NULL;
-    Method* meth;
-    InstField* ifield;
-    const char* lastClassName = "";
-
-    for (const XposedMakePublicObject* obj = list; obj->className != NULL; obj++) {
-        // load class if not done yet
-        if (strcmp(obj->className, lastClassName) != 0) {
-            lastClassName = obj->className;
-            jclass jclz = env->FindClass(obj->className);
-            if (jclz != NULL) {
-                clz = (ClassObject*) dvmDecodeIndirectRef(dvmThreadSelf(), jclz);
-            } else {
-                if (LOG_MISSING_OBJECTS) ALOGE("Could not find class %s", obj->className);
-                clz = NULL;
-                env->ExceptionClear();
-                continue;
-            }
-        } else if (clz == NULL) {
-            continue;
-        }
-
-        // make class/method/field public
-        // not using switch here because it generates undefined references to __gnu_thumb1_case_uqi
-        if (obj->type == XPOSED_MAKE_PUBLIC_CLASS) {
-            SET_CLASS_FLAG(clz, ACC_PUBLIC);
-
-        } else if (obj->type == XPOSED_MAKE_PUBLIC_VIRTUAL_METHOD) {
-            meth = dvmFindVirtualMethodHierByDescriptor(clz, obj->name, obj->signature);
-            if (meth == NULL) {
-                if (LOG_MISSING_OBJECTS) ALOGE("Could not find virtual method %s:%s in class %s", obj->name, obj->signature, obj->className);
-                env->ExceptionClear();
-                continue;
-            }
-            SET_METHOD_FLAG(meth, ACC_PUBLIC);
-
-        } else if (obj->type == XPOSED_MAKE_PUBLIC_DIRECT_METHOD) {
-            meth = dvmFindDirectMethodByDescriptor(clz, obj->name, obj->signature);
-            if (meth == NULL) {
-                if (LOG_MISSING_OBJECTS) ALOGE("Could not find direct method %s:%s in class %s", obj->name, obj->signature, obj->className);
-                env->ExceptionClear();
-                continue;
-            }
-            SET_METHOD_FLAG(meth, ACC_PUBLIC);
-
-        } else if (obj->type == XPOSED_MAKE_PUBLIC_INSTANCE_FIELD) {
-            ifield = dvmFindInstanceFieldHier(clz, obj->name, obj->signature);
-            if (ifield == NULL) {
-                if (LOG_MISSING_OBJECTS) ALOGE("Could not find instance field %s:%s in class %s", obj->name, obj->signature, obj->className);
-                env->ExceptionClear();
-                continue;
-            }
-            ifield->accessFlags |= ACC_PUBLIC;
-        }
-    }
-
-    return true;
-}
-
-
 static void xposedPrepareSubclassReplacement(jclass clazz) {
     // clazz is supposed to replace its superclass, so make sure enough memory is allocated
     ClassObject* sub = (ClassObject*) dvmDecodeIndirectRef(dvmThreadSelf(), clazz);
@@ -284,8 +194,6 @@ bool xposedOnVmCreated(JNIEnv* env, const char* className) {
     keepLoadingXposed = keepLoadingXposed && xposedInitMemberOffsets(env);
     if (!keepLoadingXposed)
         return false;
-
-    xposedMakeClassesPublic(env, xposedMakePublicList);
 
     jclass miuiResourcesClass = env->FindClass(MIUI_RESOURCES_CLASS);
     if (miuiResourcesClass != NULL) {
