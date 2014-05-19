@@ -613,6 +613,10 @@ static jobject de_robv_android_xposed_XposedBridge_getStartClassName(JNIEnv* env
 static void de_robv_android_xposed_XposedBridge_setObjectClassNative(JNIEnv* env, jclass clazz, jobject objIndirect, jclass clzIndirect) {
     Object* obj = (Object*) dvmDecodeIndirectRef(dvmThreadSelf(), objIndirect);
     ClassObject* clz = (ClassObject*) dvmDecodeIndirectRef(dvmThreadSelf(), clzIndirect);
+    if (clz->status < CLASS_INITIALIZED && !dvmInitClass(clz)) {
+        ALOGE("Could not initialize class %s", clz->descriptor);
+        return;
+    }
     obj->clazz = clz;
 }
 
