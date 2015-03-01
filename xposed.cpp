@@ -141,7 +141,7 @@ void printRomInfo() {
 
     ALOGI("-----------------");
     ALOGI("Starting Xposed binary version %s, compiled for SDK %d", XPOSED_VERSION, PLATFORM_SDK_VERSION);
-    ALOGI("Phone: %s (%s), Android version %s (SDK %s)", model, manufacturer, release, sdk);
+    ALOGI("Device: %s (%s), Android version %s (SDK %s)", model, manufacturer, release, sdk);
     ALOGI("ROM: %s", rom);
     ALOGI("Build fingerprint: %s", fingerprint);
     ALOGI("Platform: %s, %d-bit binary, system server: %s", platform, bit, xposed->startSystemServer ? "yes" : "no");
