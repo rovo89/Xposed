@@ -190,12 +190,13 @@ void* looper(void* unused __attribute__((unused))) {
                     break;
                 }
 
-                if (data->offset > 0)
-                    fseek(f, data->offset, SEEK_SET);
+                if (data->offset > 0 && fseek(f, data->offset, SEEK_SET) != 0) {
+                    shared->error = ferror(f);
+                    break;
+                }
 
-                errno = 0;
                 data->bytesRead = fread(data->content, 1, sizeof(data->content), f);
-                shared->error = errno;
+                shared->error = ferror(f);
                 data->eof = feof(f);
 
                 fclose(f);
@@ -732,17 +733,15 @@ status_t XposedService::readFile(const String16& filename16, int32_t offset, int
     }
 
     // Seek to correct offset
-    if (offset > 0) {
-        fseek(f, offset, SEEK_SET);
+    if (offset > 0 && fseek(f, offset, SEEK_SET) != 0) {
+        free(*buffer);
+        *buffer = NULL;
+        return ferror(f);
     }
 
     // Read the file
-    errno = 0;
     *bytesRead = fread(*buffer, 1, length, f);
-    status_t err = errno;
-    if (*bytesRead < length) {
-        err = EIO;
-    }
+    status_t err = ferror(f);
     if (err != 0) {
         free(*buffer);
         *buffer = NULL;
