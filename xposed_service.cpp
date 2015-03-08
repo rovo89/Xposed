@@ -193,6 +193,7 @@ void* looper(void* unused __attribute__((unused))) {
 
                 if (data->offset > 0 && fseek(f, data->offset, SEEK_SET) != 0) {
                     shared->error = ferror(f);
+                    fclose(f);
                     break;
                 }
 
@@ -762,6 +763,7 @@ status_t XposedService::readFile(const String16& filename16, int32_t offset, int
         free(*buffer);
         *buffer = NULL;
         status_t err = ferror(f);
+        fclose(f);
         if (errormsg) *errormsg = formatToString16("%s during fseek() to offset %d for %s", strerror(err), offset, filename);
         return ferror(f);
     }
