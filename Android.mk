@@ -19,7 +19,8 @@ LOCAL_SRC_FILES += \
     xposed.cpp \
     xposed_logcat.cpp \
     xposed_service.cpp \
-    xposed_safemode.cpp
+    xposed_safemode.cpp \
+    sigchain_proxy.cpp
 
 LOCAL_SHARED_LIBRARIES := \
     libcutils \
@@ -29,6 +30,8 @@ LOCAL_SHARED_LIBRARIES := \
     libandroid_runtime \
     libdl
 
+LOCAL_LDFLAGS := -Wl,--version-script,art/sigchainlib/version-script.txt -Wl,--export-dynamic
+LOCAL_CPPFLAGS := -std=c++11 -Iart
 LOCAL_CFLAGS += -DPLATFORM_SDK_VERSION=$(PLATFORM_SDK_VERSION)
 
 ifeq (1,$(strip $(shell expr $(PLATFORM_SDK_VERSION) \>= 17)))
