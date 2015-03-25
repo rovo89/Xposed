@@ -24,8 +24,7 @@ endif
 
 LOCAL_SRC_FILES += \
     libxposed_common.cpp \
-    libxposed_art.cpp \
-    sigchain_proxy.cpp
+    libxposed_art.cpp
 
 LOCAL_C_INCLUDES += \
     art/runtime \
@@ -33,14 +32,11 @@ LOCAL_C_INCLUDES += \
 
 LOCAL_SHARED_LIBRARIES += \
     libart \
-    libdl \
     liblog \
     libcutils \
     libandroidfw \
     libnativehelper
 
-LOCAL_LDFLAGS := -Wl,--version-script,art/sigchainlib/version-script.txt -Wl,--export-dynamic
-LOCAL_CPPFLAGS := -std=c++11 -Iart
 LOCAL_CFLAGS += \
     -Wno-unused-parameter \
     -DPLATFORM_SDK_VERSION=$(PLATFORM_SDK_VERSION) \
