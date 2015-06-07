@@ -345,14 +345,23 @@ void setProcessName(const char* name) {
 
 
 /** Drop all capabilities except for the mentioned ones */
-void dropCapabilities(int keep) {
+void dropCapabilities(int8_t keep[]) {
     struct __user_cap_header_struct header;
-    struct __user_cap_data_struct cap;
-    header.version = _LINUX_CAPABILITY_VERSION;
+    struct __user_cap_data_struct cap[2];
+    memset(&header, 0, sizeof(header));
+    memset(&cap, 0, sizeof(cap));
+    header.version = _LINUX_CAPABILITY_VERSION_3;
     header.pid = 0;
-    cap.effective = cap.permitted = keep;
-    cap.inheritable = 0;
-    capset(&header, &cap);
+
+    if (keep != NULL) {
+      for (int i = 0; keep[i] >= 0; i++) {
+        cap[CAP_TO_INDEX(keep[i])].permitted |= CAP_TO_MASK(keep[i]);
+      }
+      cap[0].effective = cap[0].inheritable = cap[0].permitted;
+      cap[1].effective = cap[1].inheritable = cap[1].permitted;
+    }
+
+    capset(&header, &cap[0]);
 }
 
 }  // namespace xposed
