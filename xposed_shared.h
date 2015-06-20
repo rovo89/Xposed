@@ -28,6 +28,7 @@ struct XposedShared {
     bool zygote;
     bool startSystemServer;
     const char* startClassName;
+    uint32_t xposedVersionInt;
     bool isSELinuxEnabled;
     bool isSELinuxEnforcing;
 

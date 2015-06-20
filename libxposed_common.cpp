@@ -71,6 +71,10 @@ jboolean XposedBridge_startsSystemServer(JNIEnv* env, jclass clazz) {
     return xposed->startSystemServer;
 }
 
+jint XposedBridge_getXposedVersion(JNIEnv* env, jclass clazz) {
+    return xposed->xposedVersionInt;
+}
+
 jboolean XposedBridge_initNative(JNIEnv* env, jclass clazz) {
     if (!xposedLoadedSuccessfully) {
         ALOGE("Not initializing Xposed because of previous errors");
@@ -284,6 +288,7 @@ int register_natives_XposedBridge(JNIEnv* env, jclass clazz) {
         NATIVE_METHOD(XposedBridge, getStartClassName, "()Ljava/lang/String;"),
         NATIVE_METHOD(XposedBridge, getRuntime, "()I"),
         NATIVE_METHOD(XposedBridge, startsSystemServer, "()Z"),
+        NATIVE_METHOD(XposedBridge, getXposedVersion, "()I"),
         NATIVE_METHOD(XposedBridge, initNative, "()Z"),
         NATIVE_METHOD(XposedBridge, hookMethodNative, "(Ljava/lang/reflect/Member;Ljava/lang/Class;ILjava/lang/Object;)V"),
 #ifdef ART_TARGET

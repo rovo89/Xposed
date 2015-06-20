@@ -81,6 +81,7 @@ bool initialize(bool zygote, bool startSystemServer, const char* className, int 
     xposed->zygote = zygote;
     xposed->startSystemServer = startSystemServer;
     xposed->startClassName = className;
+    xposed->xposedVersionInt = xposedVersionInt;
 
 #if XPOSED_WITH_SELINUX
     xposed->isSELinuxEnabled   = is_selinux_enabled() == 1;
