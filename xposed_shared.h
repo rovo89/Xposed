@@ -19,7 +19,6 @@
 #define ALOGV LOGV
 #endif
 
-#define XPOSED_VERSION "61"
 #define XPOSED_DIR "/data/data/de.robv.android.xposed.installer/"
 
 namespace xposed {

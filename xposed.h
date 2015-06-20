@@ -3,6 +3,8 @@
 
 #include "xposed_shared.h"
 
+#define XPOSED_PROP_FILE "/system/xposed.prop"
+
 #if defined(__LP64__)
   #define XPOSED_LIB_DIR "/system/lib64/"
 #else
@@ -30,6 +32,7 @@ namespace xposed {
     bool handleOptions(int argc, char* const argv[]);
     bool initialize(bool zygote, bool startSystemServer, const char* className, int argc, char* const argv[]);
     void printRomInfo();
+    void parseXposedProp();
     int getSdkVersion();
     bool isDisabled();
     void disableXposed();
