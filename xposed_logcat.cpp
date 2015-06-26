@@ -20,6 +20,8 @@ namespace logcat {
 // Declarations
 ////////////////////////////////////////////////////////////
 
+#define AID_LOG      1007
+#define CAP_SYSLOG   34
 char marker[50];
 
 
@@ -28,6 +30,11 @@ char marker[50];
 ////////////////////////////////////////////////////////////
 
 static void execLogcat() {
+    // Ensure that we're allowed to read all log entries
+    setresgid(AID_LOG, AID_LOG, AID_LOG);
+    int8_t keep[] = { CAP_SYSLOG, -1 };
+    xposed::dropCapabilities(keep);
+
     // Execute a logcat command that will keep running in the background
     execl("/system/bin/logcat", "logcat",
         "-v", "time",            // include timestamps in the log
@@ -63,6 +70,7 @@ static inline int dprintf(int fd, const char *format, ...) {
 
 static void runDaemon(int pipefd) {
     xposed::setProcessName("xposed_logcat");
+    xposed::dropCapabilities();
 
     umask(0);
     int logfile = open(XPOSEDLOG, O_WRONLY | O_CREAT | O_TRUNC, S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP | S_IROTH | S_IWOTH);
@@ -118,8 +126,6 @@ void start() {
     } else if (pid != 0) {
         return;
     }
-
-    xposed::dropCapabilities();
 
 #if XPOSED_WITH_SELINUX
     if (xposed->isSELinuxEnabled) {

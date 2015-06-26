@@ -39,7 +39,7 @@ namespace xposed {
     bool addJarToClasspath();
     void onVmCreated(JNIEnv* env);
     void setProcessName(const char* name);
-    void dropCapabilities(int keep = 0);
+    void dropCapabilities(int8_t keep[] = NULL);
 
 }  // namespace xposed
 
