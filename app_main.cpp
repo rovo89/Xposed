@@ -34,7 +34,7 @@ void app_usage()
 {
     fprintf(stderr,
         "Usage: app_process [java-options] cmd-dir start-class-name [options]\n");
-    fprintf(stderr, "   with Xposed support (version " XPOSED_VERSION ")\n");
+    fprintf(stderr, "   with Xposed support\n");
 }
 
 void _atrace_set_tracing_enabled(bool enabled)
