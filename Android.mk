@@ -36,6 +36,11 @@ ifeq (1,$(strip $(shell expr $(PLATFORM_SDK_VERSION) \>= 17)))
     LOCAL_CFLAGS += -DXPOSED_WITH_SELINUX=1
 endif
 
+ifeq (1,$(strip $(shell expr $(PLATFORM_SDK_VERSION) \>= 22)))
+    LOCAL_WHOLE_STATIC_LIBRARIES := libsigchain
+    LOCAL_LDFLAGS := -Wl,--version-script,art/sigchainlib/version-script.txt -Wl,--export-dynamic
+endif
+
 LOCAL_MODULE := xposed
 LOCAL_MODULE_TAGS := optional
 LOCAL_STRIP_MODULE := keep_symbols
