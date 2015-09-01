@@ -29,7 +29,6 @@ LOCAL_SHARED_LIBRARIES := \
     libandroid_runtime \
     libdl
 
-LOCAL_LDFLAGS := -Wl,--version-script,art/sigchainlib/version-script.txt -Wl,--export-dynamic
 LOCAL_CFLAGS += -DPLATFORM_SDK_VERSION=$(PLATFORM_SDK_VERSION)
 
 ifeq (1,$(strip $(shell expr $(PLATFORM_SDK_VERSION) \>= 17)))
@@ -37,7 +36,10 @@ ifeq (1,$(strip $(shell expr $(PLATFORM_SDK_VERSION) \>= 17)))
     LOCAL_CFLAGS += -DXPOSED_WITH_SELINUX=1
 endif
 
-LOCAL_WHOLE_STATIC_LIBRARIES := libsigchain
+ifeq (1,$(strip $(shell expr $(PLATFORM_SDK_VERSION) \>= 22)))
+    LOCAL_WHOLE_STATIC_LIBRARIES := libsigchain
+    LOCAL_LDFLAGS := -Wl,--version-script,art/sigchainlib/version-script.txt -Wl,--export-dynamic
+endif
 
 LOCAL_MODULE := xposed
 LOCAL_MODULE_TAGS := optional
