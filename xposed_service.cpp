@@ -581,12 +581,8 @@ status_t BnXposedService::onTransact(uint32_t code, const Parcel& data, Parcel* 
             reply->writeInt64(size);
             reply->writeInt64(mtime);
             if (bytesRead > 0) {
-#if PLATFORM_SDK_VERSION >= 21
-                reply->writeByteArray(bytesRead, buffer);
-#else
                 reply->writeInt32(bytesRead);
                 reply->write(buffer, bytesRead);
-#endif
                 free(buffer);
             } else {
                 reply->writeInt32(bytesRead); // empty array (0) or null (-1)
