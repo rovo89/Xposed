@@ -120,7 +120,7 @@ void XposedBridge_hookMethodNative(JNIEnv* env, jclass, jobject javaReflectedMet
     mirror::ArtMethod* artMethod = soa.Decode<mirror::ArtMethod*>(javaArtMethod);
 
     // Hook the method
-    artMethod->EnableXposedHook(env, javaAdditionalInfo);
+    artMethod->EnableXposedHook(soa, javaAdditionalInfo);
 }
 
 jobject XposedBridge_invokeOriginalMethodNative(JNIEnv* env, jclass, jobject javaMethod,
