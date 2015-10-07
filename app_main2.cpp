@@ -23,6 +23,7 @@
 #include <sys/prctl.h>
 
 #include "xposed.h"
+#include <dlfcn.h>
 
 static bool isXposedLoaded = false;
 
@@ -193,6 +194,36 @@ static const char ABI_LIST_PROPERTY[] = "ro.product.cpu.abilist32";
 static const char ZYGOTE_NICE_NAME[] = "zygote";
 #endif
 
+static void runtimeStart(AppRuntime& runtime, const char *classname, const Vector<String8>& options, bool zygote)
+{
+#if PLATFORM_SDK_VERSION == 21
+  runtime.start(classname, options);
+#elif PLATFORM_SDK_VERSION >= 23
+  runtime.start(classname, options, zygote);
+#else
+  // try newer variant (5.1.1_r19 and later) first
+  void (*ptr1)(AppRuntime&, const char*, const Vector<String8>&, bool);
+  *(void **) (&ptr1) = dlsym(RTLD_DEFAULT, "_ZN7android14AndroidRuntime5startEPKcRKNS_6VectorINS_7String8EEEb");
+
+  if (ptr1 != NULL) {
+    ptr1(runtime, classname, options, zygote);
+    return;
+  }
+
+  // fall back to older variant
+  void (*ptr2)(AppRuntime&, const char*, const Vector<String8>&);
+  *(void **) (&ptr2) = dlsym(RTLD_DEFAULT, "_ZN7android14AndroidRuntime5startEPKcRKNS_6VectorINS_7String8EEE");
+
+  if (ptr2 != NULL) {
+    ptr2(runtime, classname, options);
+    return;
+  }
+
+  // should not happen
+  LOG_ALWAYS_FATAL("app_process: could not locate AndroidRuntime::start() method.");
+#endif
+}
+
 int main(int argc, char* const argv[])
 {
     if (prctl(PR_SET_NO_NEW_PRIVS, 1, 0, 0, 0) < 0) {
@@ -318,9 +349,9 @@ int main(int argc, char* const argv[])
 
     isXposedLoaded = xposed::initialize(zygote, startSystemServer, className, argc, argv);
     if (zygote) {
-        runtime.start(isXposedLoaded ? XPOSED_CLASS_DOTS_ZYGOTE : "com.android.internal.os.ZygoteInit", args);
+        runtimeStart(runtime, isXposedLoaded ? XPOSED_CLASS_DOTS_ZYGOTE : "com.android.internal.os.ZygoteInit", args, zygote);
     } else if (className) {
-        runtime.start(isXposedLoaded ? XPOSED_CLASS_DOTS_TOOLS : "com.android.internal.os.RuntimeInit", args);
+        runtimeStart(runtime, isXposedLoaded ? XPOSED_CLASS_DOTS_TOOLS : "com.android.internal.os.RuntimeInit", args, zygote);
     } else {
         fprintf(stderr, "Error: no class name or --zygote supplied.\n");
         app_usage();
