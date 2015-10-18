@@ -196,9 +196,7 @@ static const char ZYGOTE_NICE_NAME[] = "zygote";
 
 static void runtimeStart(AppRuntime& runtime, const char *classname, const Vector<String8>& options, bool zygote)
 {
-#if PLATFORM_SDK_VERSION == 21
-  runtime.start(classname, options);
-#elif PLATFORM_SDK_VERSION >= 23
+#if PLATFORM_SDK_VERSION >= 23
   runtime.start(classname, options, zygote);
 #else
   // try newer variant (5.1.1_r19 and later) first
