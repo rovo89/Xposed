@@ -7,6 +7,12 @@
 
 #define LOG_TAG "appproc"
 
+#include <stdio.h>
+#include <stdlib.h>
+#include <sys/prctl.h>
+#include <sys/stat.h>
+#include <unistd.h>
+
 #include <binder/IPCThreadState.h>
 #include <binder/ProcessState.h>
 #include <utils/Log.h>
@@ -16,11 +22,6 @@
 #include <cutils/trace.h>
 #include <android_runtime/AndroidRuntime.h>
 #include <private/android_filesystem_config.h>  // for AID_SYSTEM
-
-#include <stdlib.h>
-#include <stdio.h>
-#include <unistd.h>
-#include <sys/prctl.h>
 
 #include "xposed.h"
 #include <dlfcn.h>
@@ -100,8 +101,10 @@ public:
 
     virtual void onZygoteInit()
     {
+#if PLATFORM_SDK_VERSION <= 22
         // Re-enable tracing now that we're no longer in Zygote.
         atrace_set_tracing_enabled(true);
+#endif
 
         sp<ProcessState> proc = ProcessState::self();
         ALOGV("App process: starting thread pool.\n");
@@ -157,8 +160,10 @@ static void maybeCreateDalvikCache() {
     static const char kInstructionSet[] = "arm";
 #elif defined(__i386__)
     static const char kInstructionSet[] = "x86";
-#elif defined (__mips__)
+#elif defined (__mips__) && !defined(__LP64__)
     static const char kInstructionSet[] = "mips";
+#elif defined (__mips__) && defined(__LP64__)
+    static const char kInstructionSet[] = "mips64";
 #else
 #error "Unknown instruction set"
 #endif
