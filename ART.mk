@@ -4,51 +4,49 @@
 
 include $(CLEAR_VARS)
 
-ifeq ($(PLATFORM_SDK_VERSION),19)
-    include art/build/Android.common.mk
-    LOCAL_CLANG := $(ART_TARGET_CLANG)
-    LOCAL_CFLAGS := $(ART_TARGET_CFLAGS) $(ART_TARGET_NON_DEBUG_CFLAGS)
+include art/build/Android.common_build.mk
+$(eval $(call set-target-local-clang-vars))
+$(eval $(call set-target-local-cflags-vars,ndebug))
 
-    include external/stlport/libstlport.mk
+ifeq (1,$(strip $(shell expr $(PLATFORM_SDK_VERSION) \>= 23)))
+  LOCAL_C_INCLUDES += \
+    external/valgrind \
+    external/valgrind/include
 else
-    include art/build/Android.common_build.mk
-    $(eval $(call set-target-local-clang-vars))
-    $(eval $(call set-target-local-cflags-vars,ndebug))
-
-    include external/libcxx/libcxx.mk
-    LOCAL_C_INCLUDES += \
-        external/valgrind/main \
-        external/valgrind/main/include
-    LOCAL_MULTILIB := both
+  include external/libcxx/libcxx.mk
+  LOCAL_C_INCLUDES += \
+    external/valgrind/main \
+    external/valgrind/main/include
 endif
 
 LOCAL_SRC_FILES += \
-    libxposed_common.cpp \
-    libxposed_art.cpp
+  libxposed_common.cpp \
+  libxposed_art.cpp
 
 LOCAL_C_INCLUDES += \
-    art/runtime \
-    external/gtest/include
+  art/runtime \
+  external/gtest/include
 
 LOCAL_SHARED_LIBRARIES += \
-    libart \
-    liblog \
-    libcutils \
-    libandroidfw \
-    libnativehelper
+  libart \
+  liblog \
+  libcutils \
+  libandroidfw \
+  libnativehelper
 
 LOCAL_CFLAGS += \
-    -Wno-unused-parameter \
-    -DPLATFORM_SDK_VERSION=$(PLATFORM_SDK_VERSION) \
-    -DXPOSED_WITH_SELINUX=1
+  -Wno-unused-parameter \
+  -DPLATFORM_SDK_VERSION=$(PLATFORM_SDK_VERSION) \
+  -DXPOSED_WITH_SELINUX=1
 
 LOCAL_MODULE := libxposed_art
 LOCAL_MODULE_TAGS := optional
 LOCAL_STRIP_MODULE := keep_symbols
+LOCAL_MULTILIB := both
 
 # Always build both architecture (if applicable)
 ifeq ($(TARGET_IS_64_BIT),true)
-    $(LOCAL_MODULE): $(LOCAL_MODULE)$(TARGET_2ND_ARCH_MODULE_SUFFIX)
+  $(LOCAL_MODULE): $(LOCAL_MODULE)$(TARGET_2ND_ARCH_MODULE_SUFFIX)
 endif
 
 include $(BUILD_SHARED_LIBRARY)
