@@ -14,6 +14,7 @@
 #endif
 #include "mirror/object-inl.h"
 #include "mirror/throwable.h"
+#include "native/scoped_fast_native_object_access.h"
 #include "reflection.h"
 #include "scoped_thread_state_change.h"
 #include "well_known_classes.h"
@@ -145,7 +146,7 @@ void XposedBridge_hookMethodNative(JNIEnv* env, jclass, jobject javaReflectedMet
 
 jobject XposedBridge_invokeOriginalMethodNative(JNIEnv* env, jclass, jobject javaMethod,
             jint, jobjectArray, jclass, jobject javaReceiver, jobjectArray javaArgs) {
-  ScopedObjectAccess soa(env);
+    ScopedFastNativeObjectAccess soa(env);
 #if PLATFORM_SDK_VERSION >= 23
     return InvokeMethod(soa, javaMethod, javaReceiver, javaArgs);
 #else
