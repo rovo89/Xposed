@@ -9,6 +9,7 @@
 #include "xposed_safemode.h"
 #include "xposed_service.h"
 
+#include <cstring>
 #include <ctype.h>
 #include <cutils/process_name.h>
 #include <cutils/properties.h>
@@ -365,7 +366,6 @@ void onVmCreated(JNIEnv* env) {
     }
 
     // Load the suitable libxposed_*.so for it
-    const char *error;
     void* xposedLibHandle = dlopen(xposedLibPath, RTLD_NOW);
     if (!xposedLibHandle) {
         ALOGE("Could not load libxposed: %s", dlerror());

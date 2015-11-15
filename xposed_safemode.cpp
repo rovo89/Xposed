@@ -20,12 +20,14 @@
  */
 #include "xposed_safemode.h"
 
+#include <cstring>
 #include <dirent.h>
 #include <fcntl.h>
 #include <linux/input.h>
 #include <sys/epoll.h>
 #include <time.h>
 #include <stdio.h>
+#include <unistd.h>
 
 #define INITIAL_DELAY 2
 #define DETECTION_TIMEOUT 5

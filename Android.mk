@@ -29,6 +29,7 @@ LOCAL_SHARED_LIBRARIES := \
   libandroid_runtime \
   libdl
 
+LOCAL_CFLAGS += -Wall -Werror -Wextra -Wunused -Wunreachable-code
 LOCAL_CFLAGS += -DPLATFORM_SDK_VERSION=$(PLATFORM_SDK_VERSION)
 
 ifeq (1,$(strip $(shell expr $(PLATFORM_SDK_VERSION) \>= 17)))

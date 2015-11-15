@@ -283,7 +283,6 @@ int accessFile(const char* path, int mode) {
 
     callService(OP_ACCESS_FILE);
 
-    bail:
     makeIdle();
     errno = shared->error;
     return shared->error ? -1 : data->result;
@@ -307,7 +306,6 @@ int statFile(const char* path, struct stat* st) {
 
     memcpy(st, &data->st, sizeof(struct stat));
 
-    bail:
     makeIdle();
     errno = shared->error;
     return shared->error ? -1 : data->result;
@@ -468,8 +466,8 @@ class BpXposedService: public BpInterface<IXposedService> {
 
             int64_t size1 = reply.readInt64();
             int64_t mtime1 = reply.readInt64();
-            if (size != NULL) size1 = *size;
-            if (mtime != NULL) mtime1 = *mtime;
+            if (size != NULL) *size = size1;
+            if (mtime != NULL) *mtime = mtime1;
             return 0;
         }
 
@@ -547,7 +545,6 @@ status_t BnXposedService::onTransact(uint32_t code, const Parcel& data, Parcel* 
         case STAT_FILE_TRANSACTION: {
             CHECK_INTERFACE(IXposedService, data, reply);
             String16 filename = data.readString16();
-            int32_t mode = data.readInt32();
             int64_t size, time;
             status_t result = statFile(filename, &size, &time);
             int err = errno;
@@ -721,14 +718,14 @@ status_t XposedService::readFile(const String16& filename16, int32_t offset, int
 
     // Check range
     if (offset > 0 && offset >= *size) {
-        if (errormsg) *errormsg = formatToString16("offset %d >= size %"PRId64" for %s", offset, *size, filename);
+        if (errormsg) *errormsg = formatToString16("offset %d >= size %" PRId64 " for %s", offset, *size, filename);
         return EINVAL;
     } else if (offset < 0) {
         offset = 0;
     }
 
     if (length > 0 && (offset + length) > *size) {
-        if (errormsg) *errormsg = formatToString16("offset %d + length %d > size %"PRId64" for %s", offset, length, *size, filename);
+        if (errormsg) *errormsg = formatToString16("offset %d + length %d > size %" PRId64 " for %s", offset, length, *size, filename);
         return EINVAL;
     } else if (*size == 0) {
         *bytesRead = 0;

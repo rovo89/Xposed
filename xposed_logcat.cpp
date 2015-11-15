@@ -4,6 +4,7 @@
 
 #define LOG_TAG "Xposed"
 
+#include <cstring>
 #include <errno.h>
 #include <fcntl.h>
 #include <stdlib.h>
