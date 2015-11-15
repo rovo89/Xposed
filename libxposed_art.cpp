@@ -145,8 +145,14 @@ void XposedBridge_hookMethodNative(JNIEnv* env, jclass, jobject javaReflectedMet
 }
 
 jobject XposedBridge_invokeOriginalMethodNative(JNIEnv* env, jclass, jobject javaMethod,
-            jint, jobjectArray, jclass, jobject javaReceiver, jobjectArray javaArgs) {
+            jint isResolved, jobjectArray, jclass, jobject javaReceiver, jobjectArray javaArgs) {
     ScopedFastNativeObjectAccess soa(env);
+    if (UNLIKELY(!isResolved)) {
+        ArtMethod* artMethod = ArtMethod::FromReflectedMethod(soa, javaMethod);
+        if (LIKELY(artMethod->IsXposedHookedMethod())) {
+            javaMethod = artMethod->GetXposedHookInfo()->reflectedMethod;
+        }
+    }
 #if PLATFORM_SDK_VERSION >= 23
     return InvokeMethod(soa, javaMethod, javaReceiver, javaArgs);
 #else
