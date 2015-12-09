@@ -44,6 +44,9 @@ namespace xposed {
     bool shouldSkipSafemodeDelay();
     bool shouldIgnoreCommand(int argc, const char* const argv[]);
     bool addJarToClasspath();
+#if PLATFORM_SDK_VERSION >= 21
+    void htcAdjustSystemServerClassPath();
+#endif
     void onVmCreated(JNIEnv* env);
     void setProcessName(const char* name);
     void dropCapabilities(int8_t keep[] = NULL);
