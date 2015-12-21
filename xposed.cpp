@@ -104,6 +104,9 @@ bool initialize(bool zygote, bool startSystemServer, const char* className, int 
     printRomInfo();
 
     if (startSystemServer) {
+#if PLATFORM_SDK_VERSION >= 21
+        htcAdjustSystemServerClassPath();
+#endif
         if (!xposed::service::startAll())
             return false;
 #if XPOSED_WITH_SELINUX
@@ -285,6 +288,23 @@ bool shouldIgnoreCommand(int argc, const char* const argv[]) {
     return false;
 }
 
+/** Adds a path to the beginning of an environment variable. */
+static bool addPathToEnv(const char* name, const char* path) {
+    char* oldPath = getenv(name);
+    if (oldPath == NULL) {
+        setenv(name, path, 1);
+    } else {
+        char newPath[4096];
+        int neededLength = snprintf(newPath, sizeof(newPath), "%s:%s", path, oldPath);
+        if (neededLength >= (int)sizeof(newPath)) {
+            ALOGE("ERROR: %s would exceed %d characters", name, sizeof(newPath));
+            return false;
+        }
+        setenv(name, newPath, 1);
+    }
+    return true;
+}
+
 /** Add XposedBridge.jar to the Java classpath. */
 bool addJarToClasspath() {
     ALOGI("-----------------");
@@ -302,18 +322,9 @@ bool addJarToClasspath() {
     */
 
     if (access(XPOSED_JAR, R_OK) == 0) {
-        char* oldClassPath = getenv("CLASSPATH");
-        if (oldClassPath == NULL) {
-            setenv("CLASSPATH", XPOSED_JAR, 1);
-        } else {
-            char classPath[4096];
-            int neededLength = snprintf(classPath, sizeof(classPath), "%s:%s", XPOSED_JAR, oldClassPath);
-            if (neededLength >= (int)sizeof(classPath)) {
-                ALOGE("ERROR: CLASSPATH would exceed %d characters", sizeof(classPath));
-                return false;
-            }
-            setenv("CLASSPATH", classPath, 1);
-        }
+        if (!addPathToEnv("CLASSPATH", XPOSED_JAR))
+            return false;
+
         ALOGI("Added Xposed (%s) to CLASSPATH", XPOSED_JAR);
         return true;
     } else {
@@ -321,6 +332,16 @@ bool addJarToClasspath() {
         return false;
     }
 }
+
+#if PLATFORM_SDK_VERSION >= 21
+/** On HTC ROMs, ensure that ub.jar is compiled before the system server is started. */
+void htcAdjustSystemServerClassPath() {
+    if (access("/system/framework/ub.jar", F_OK) != 0)
+        return;
+
+    addPathToEnv("SYSTEMSERVERCLASSPATH", "/system/framework/ub.jar");
+}
+#endif
 
 /** Callback which checks the loaded shared libraries for libdvm/libart. */
 static bool determineRuntime(const char** xposedLibPath) {
