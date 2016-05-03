@@ -104,9 +104,6 @@ bool initialize(bool zygote, bool startSystemServer, const char* className, int 
     printRomInfo();
 
     if (startSystemServer) {
-#if PLATFORM_SDK_VERSION >= 21
-        htcAdjustSystemServerClassPath();
-#endif
         if (!xposed::service::startAll())
             return false;
 #if XPOSED_WITH_SELINUX
@@ -332,16 +329,6 @@ bool addJarToClasspath() {
         return false;
     }
 }
-
-#if PLATFORM_SDK_VERSION >= 21
-/** On HTC ROMs, ensure that ub.jar is compiled before the system server is started. */
-void htcAdjustSystemServerClassPath() {
-    if (access("/system/framework/ub.jar", F_OK) != 0)
-        return;
-
-    addPathToEnv("SYSTEMSERVERCLASSPATH", "/system/framework/ub.jar");
-}
-#endif
 
 /** Callback which checks the loaded shared libraries for libdvm/libart. */
 static bool determineRuntime(const char** xposedLibPath) {
