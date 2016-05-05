@@ -79,6 +79,11 @@ bool initialize(bool zygote, bool startSystemServer, const char* className, int 
         return false;
 #endif
 
+    if (isMinimalFramework()) {
+        ALOGI("Not loading Xposed for minimal framework (encrypted device)");
+        return false;
+    }
+
     xposed->zygote = zygote;
     xposed->startSystemServer = startSystemServer;
     xposed->startClassName = className;
@@ -428,6 +433,20 @@ void dropCapabilities(int8_t keep[]) {
     }
 
     capset(&header, &cap[0]);
+}
+
+/**
+ * Checks whether the system is booting into a minimal Android framework.
+ * This is the case when the device is encrypted with a password that
+ * has to be entered on boot. /data is a tmpfs in that case, so we
+ * can't load any modules anyway.
+ * The system will reboot later with the full framework.
+ */
+bool isMinimalFramework() {
+    char voldDecrypt[PROPERTY_VALUE_MAX];
+    property_get("vold.decrypt", voldDecrypt, "");
+    return ((strcmp(voldDecrypt, "trigger_restart_min_framework") == 0) ||
+            (strcmp(voldDecrypt, "1") == 0));
 }
 
 }  // namespace xposed

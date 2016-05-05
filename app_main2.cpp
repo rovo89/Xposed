@@ -238,8 +238,9 @@ int main(int argc, char* const argv[])
         }
     }
 
-    if (xposed::handleOptions(argc, argv))
-            return 0;
+    if (xposed::handleOptions(argc, argv)) {
+        return 0;
+    }
 
     AppRuntime runtime(argv[0], computeArgBlockSize(argc, argv));
     // Process command line arguments

@@ -47,6 +47,7 @@ namespace xposed {
     void onVmCreated(JNIEnv* env);
     void setProcessName(const char* name);
     void dropCapabilities(int8_t keep[] = NULL);
+    bool isMinimalFramework();
 
 }  // namespace xposed
 
