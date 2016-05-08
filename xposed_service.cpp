@@ -152,7 +152,7 @@ static inline bool isServiceAccessible() {
 void* looper(void* unused __attribute__((unused))) {
     pthread_mutex_lock(&shared->workerMutex);
     shared->state = STATE_IDLE;
-    pthread_cond_signal(&shared->workerCond);
+    pthread_cond_broadcast(&shared->workerCond);
     while (1) {
         while (shared->state != STATE_SERVICE_ACTION) {
             pthread_cond_wait(&shared->workerCond, &shared->workerMutex);
@@ -217,7 +217,7 @@ void* looper(void* unused __attribute__((unused))) {
         }
 
         shared->state = STATE_SERVER_RESPONSE;
-        pthread_cond_signal(&shared->workerCond);
+        pthread_cond_broadcast(&shared->workerCond);
     }
 
     pthread_mutex_unlock(&shared->workerMutex);
@@ -252,7 +252,7 @@ static inline void callService(Action action) {
     shared->action = action;
     shared->state = STATE_SERVICE_ACTION;
     shared->error = 0;
-    pthread_cond_signal(&shared->workerCond);
+    pthread_cond_broadcast(&shared->workerCond);
 
     while (shared->state != STATE_SERVER_RESPONSE) {
         pthread_cond_wait(&shared->workerCond, &shared->workerMutex);
@@ -262,7 +262,7 @@ static inline void callService(Action action) {
 static inline void makeIdle() {
     shared->action = OP_NONE;
     shared->state = STATE_IDLE;
-    pthread_cond_signal(&shared->workerCond);
+    pthread_cond_broadcast(&shared->workerCond);
     pthread_mutex_unlock(&shared->workerMutex);
 }
 
