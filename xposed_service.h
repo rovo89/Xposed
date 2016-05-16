@@ -15,6 +15,7 @@ namespace service {
         int accessFile(const char* path, int mode);
         int statFile(const char* path, struct stat* stat);
         char* readFile(const char* path, int* bytesRead);
+        void restrictMemoryInheritance();
     }  // namespace membased
 #endif  // XPOSED_WITH_SELINUX
 

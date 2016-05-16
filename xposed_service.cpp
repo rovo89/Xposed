@@ -133,7 +133,7 @@ static bool init() {
     return true;
 }
 
-static void restrictMemoryInheritance() {
+void restrictMemoryInheritance() {
     madvise(shared, sizeof(MemBasedState), MADV_DONTFORK);
     canAlwaysAccessService = false;
 }
@@ -884,12 +884,9 @@ static void appService(bool useSingleProcess) {
 }
 
 bool checkMembasedRunning() {
-    // Don't let any further forks inherit this mapping
-    membased::restrictMemoryInheritance();
-
     // Ensure that the memory based service is running
     if (!membased::waitForRunning(5)) {
-        ALOGE("Zygote service is not running, Xposed cannot work without it");
+        ALOGE("Xposed's Zygote service is not running, cannot work without it");
         return false;
     }
 

@@ -98,7 +98,7 @@ bool initialize(bool zygote, bool startSystemServer, const char* className, int 
 #endif  // XPOSED_WITH_SELINUX
 
     if (startSystemServer) {
-        xposed::logcat::start();
+        xposed::logcat::printStartupMarker();
     } else if (zygote) {
         // TODO Find a better solution for this
         // Give the primary Zygote process a little time to start first.
@@ -109,14 +109,24 @@ bool initialize(bool zygote, bool startSystemServer, const char* className, int 
     printRomInfo();
 
     if (startSystemServer) {
-        if (!xposed::service::startAll())
+        if (!xposed::service::startAll()) {
             return false;
+        }
+        xposed::logcat::start();
 #if XPOSED_WITH_SELINUX
     } else if (xposed->isSELinuxEnabled) {
-        if (!xposed::service::startMembased())
+        if (!xposed::service::startMembased()) {
             return false;
+        }
 #endif  // XPOSED_WITH_SELINUX
     }
+
+#if XPOSED_WITH_SELINUX
+    // Don't let any further forks access the Zygote service
+    if (xposed->isSELinuxEnabled) {
+        xposed::service::membased::restrictMemoryInheritance();
+    }
+#endif  // XPOSED_WITH_SELINUX
 
     // FIXME Zygote has no access to input devices, this would need to be check in system_server context
     if (zygote && !isSafemodeDisabled() && detectSafemodeTrigger(shouldSkipSafemodeDelay()))

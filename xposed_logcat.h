@@ -8,6 +8,7 @@
 namespace xposed {
 namespace logcat {
 
+    void printStartupMarker();
     void start();
 
 }  // namespace logcat

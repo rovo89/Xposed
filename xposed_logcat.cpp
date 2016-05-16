@@ -115,10 +115,12 @@ static void runDaemon(int pipefd) {
     exit(EXIT_FAILURE);
 }
 
-void start() {
+void printStartupMarker() {
     sprintf(marker, "Current time: %d, PID: %d", (int) time(NULL), getpid());
     ALOG(LOG_DEBUG, "XposedStartupMarker", marker, NULL);
+}
 
+void start() {
     // Fork to create a daemon
     pid_t pid;
     if ((pid = fork()) < 0) {
