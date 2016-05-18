@@ -11,6 +11,7 @@
 #include <unistd.h>
 
 #include "xposed.h"
+#include "xposed_service.h"
 #include "xposed_logcat.h"
 
 
@@ -37,17 +38,23 @@ static void execLogcat() {
     xposed::dropCapabilities(keep);
 
     // Execute a logcat command that will keep running in the background
-    execl("/system/bin/logcat", "logcat",
-        "-v", "time",            // include timestamps in the log
-        "-s",                    // be silent by default, except for the following tags
-        "XposedStartupMarker:D", // marks the beginning of the current log
-        "Xposed:I",              // Xposed framework and default logging
-        "appproc:I",             // app_process
-        "XposedInstaller:I",     // Xposed Installer
-        "art:F",                 // ART crashes
-        "libc:F",                // Native crashes
-        "DEBUG:I",               // Native crashes
-        (char*) 0);
+    if (zygote_access(XPOSEDLOG_CONF_ALL, F_OK) == 0) {
+        execl("/system/bin/logcat", "logcat",
+            "-v", "time",            // include timestamps in the log
+            (char*) 0);
+    } else {
+        execl("/system/bin/logcat", "logcat",
+            "-v", "time",            // include timestamps in the log
+            "-s",                    // be silent by default, except for the following tags
+            "XposedStartupMarker:D", // marks the beginning of the current log
+            "Xposed:I",              // Xposed framework and default logging
+            "appproc:I",             // app_process
+            "XposedInstaller:I",     // Xposed Installer
+            "art:F",                 // ART crashes
+            "libc:F",                // Native crashes
+            "DEBUG:I",               // Native crashes
+            (char*) 0);
+    }
 
     // We only get here in case of errors
     ALOGE("Could not execute logcat: %s", strerror(errno));
