@@ -51,8 +51,6 @@ static void execLogcat() {
             "appproc:I",             // app_process
             "XposedInstaller:I",     // Xposed Installer
             "art:F",                 // ART crashes
-            "libc:F",                // Native crashes
-            "DEBUG:I",               // Native crashes
             (char*) 0);
     }
 
