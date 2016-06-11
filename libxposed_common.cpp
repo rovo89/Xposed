@@ -101,7 +101,7 @@ jboolean XposedBridge_initNative(JNIEnv* env, jclass clazz) {
     methodXResourcesTranslateResId = env->GetStaticMethodID(classXResources, "translateResId",
         "(ILandroid/content/res/XResources;Landroid/content/res/Resources;)I");
     if (methodXResourcesTranslateResId == NULL) {
-        ALOGE("ERROR: could not find method %s.translateResId(int, Resources, Resources)", CLASS_XRESOURCES);
+        ALOGE("ERROR: could not find method %s.translateResId(int, XResources, Resources)", CLASS_XRESOURCES);
         logExceptionStackTrace();
         env->ExceptionClear();
         return false;
@@ -110,7 +110,7 @@ jboolean XposedBridge_initNative(JNIEnv* env, jclass clazz) {
     methodXResourcesTranslateAttrId = env->GetStaticMethodID(classXResources, "translateAttrId",
         "(Ljava/lang/String;Landroid/content/res/XResources;)I");
     if (methodXResourcesTranslateAttrId == NULL) {
-        ALOGE("ERROR: could not find method %s.findAttrId(String, Resources, Resources)", CLASS_XRESOURCES);
+        ALOGE("ERROR: could not find method %s.findAttrId(String, XResources)", CLASS_XRESOURCES);
         logExceptionStackTrace();
         env->ExceptionClear();
         return false;
