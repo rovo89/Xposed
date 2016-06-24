@@ -29,7 +29,7 @@ LOCAL_SHARED_LIBRARIES := \
   libandroid_runtime \
   libdl
 
-LOCAL_CFLAGS += -Wall -Werror -Wextra -Wunused -Wunreachable-code
+LOCAL_CFLAGS += -Wall -Werror -Wextra -Wunused
 LOCAL_CFLAGS += -DPLATFORM_SDK_VERSION=$(PLATFORM_SDK_VERSION)
 
 ifeq (1,$(strip $(shell expr $(PLATFORM_SDK_VERSION) \>= 17)))
@@ -46,7 +46,7 @@ LOCAL_MODULE := xposed
 LOCAL_MODULE_TAGS := optional
 LOCAL_STRIP_MODULE := keep_symbols
 
-# Always build both architecture (if applicable)
+# Always build both architectures (if applicable)
 ifeq ($(TARGET_IS_64_BIT),true)
   $(LOCAL_MODULE): $(LOCAL_MODULE)$(TARGET_2ND_ARCH_MODULE_SUFFIX)
 endif
