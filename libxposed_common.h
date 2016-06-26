@@ -22,21 +22,20 @@ namespace xposed {
 /////////////////////////////////////////////////////////////////
 // Provided by common part, used by runtime-specific implementation
 /////////////////////////////////////////////////////////////////
-extern bool xposedLoadedSuccessfully;
 extern jclass classXposedBridge;
+extern jmethodID methodXposedBridgeHandleHookedMethod;
 
 extern int readIntConfig(const char* fileName, int defaultValue);
-extern int register_natives_XposedBridge(JNIEnv* env, jclass clazz);
+extern void onVmCreatedCommon(JNIEnv* env);
 
 
 /////////////////////////////////////////////////////////////////
 // To be provided by runtime-specific implementation
 /////////////////////////////////////////////////////////////////
 extern "C" bool xposedInitLib(xposed::XposedShared* shared);
-extern void onVmCreated(JNIEnv* env);
+extern bool onVmCreated(JNIEnv* env);
+extern void prepareSubclassReplacement(JNIEnv* env, jclass clazz);
 extern void logExceptionStackTrace();
-
-extern jboolean callback_XposedBridge_initNative(JNIEnv* env);
 
 extern jint    XposedBridge_getRuntime(JNIEnv* env, jclass clazz);
 extern void    XposedBridge_hookMethodNative(JNIEnv* env, jclass clazz, jobject reflectedMethodIndirect,

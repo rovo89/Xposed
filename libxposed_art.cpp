@@ -27,12 +27,6 @@ using art::mirror::ArtMethod;
 
 namespace xposed {
 
-////////////////////////////////////////////////////////////
-// Forward declarations
-////////////////////////////////////////////////////////////
-
-void prepareSubclassReplacement(JNIEnv* env, jclass clazz);
-
 
 ////////////////////////////////////////////////////////////
 // Library initialization
@@ -41,47 +35,16 @@ void prepareSubclassReplacement(JNIEnv* env, jclass clazz);
 /** Called by Xposed's app_process replacement. */
 bool xposedInitLib(XposedShared* shared) {
     xposed = shared;
-    xposed->onVmCreated = &onVmCreated;
+    xposed->onVmCreated = &onVmCreatedCommon;
     return true;
 }
 
 /** Called very early during VM startup. */
-void onVmCreated(JNIEnv* env) {
+bool onVmCreated(JNIEnv* env) {
     // TODO: Handle CLASS_MIUI_RESOURCES?
-
-    jclass classXTypedArray = env->FindClass(CLASS_XTYPED_ARRAY);
-    if (classXTypedArray == nullptr) {
-        XLOG(ERROR) << "Error while loading XTypedArray class '" CLASS_XTYPED_ARRAY "'";
-        logExceptionStackTrace();
-        env->ExceptionClear();
-        return;
-    }
-    prepareSubclassReplacement(env, classXTypedArray);
-
-    classXposedBridge = env->FindClass(CLASS_XPOSED_BRIDGE);
-    if (classXposedBridge == nullptr) {
-        XLOG(ERROR) << "Error while loading Xposed class '" CLASS_XPOSED_BRIDGE "'";
-        logExceptionStackTrace();
-        env->ExceptionClear();
-        return;
-    }
-    classXposedBridge = reinterpret_cast<jclass>(env->NewGlobalRef(classXposedBridge));
     ArtMethod::xposed_callback_class = classXposedBridge;
-
-    XLOG(INFO) << "Found Xposed class " CLASS_XPOSED_BRIDGE ", now initializing";
-    if (register_natives_XposedBridge(env, classXposedBridge) != JNI_OK) {
-#if PLATFORM_SDK_VERSION >= 23
-        auto* exception = Thread::Current()->GetException();
-#else
-        auto* exception = Thread::Current()->GetException(nullptr);
-#endif
-        XLOG(ERROR) << "Could not register natives for '" CLASS_XPOSED_BRIDGE "':\n  "
-                    << exception->GetDetailMessage()->ToModifiedUtf8();
-        env->ExceptionClear();
-        return;
-    }
-
-    xposedLoadedSuccessfully = true;
+    ArtMethod::xposed_callback_method = methodXposedBridgeHandleHookedMethod;
+    return true;
 }
 
 
@@ -110,19 +73,6 @@ void prepareSubclassReplacement(JNIEnv* env, jclass clazz) {
 ////////////////////////////////////////////////////////////
 // JNI methods
 ////////////////////////////////////////////////////////////
-
-jboolean callback_XposedBridge_initNative(JNIEnv* env) {
-    ArtMethod::xposed_callback_method = env->GetStaticMethodID(classXposedBridge, "handleHookedMethod",
-        "(Ljava/lang/reflect/Member;ILjava/lang/Object;Ljava/lang/Object;[Ljava/lang/Object;)Ljava/lang/Object;");
-    if (ArtMethod::xposed_callback_method == nullptr) {
-        XLOG(ERROR) << "ERROR: Could not find method " CLASS_XPOSED_BRIDGE ".handleHookedMethod(Member, int, Object, Object, Object[])";
-        logExceptionStackTrace();
-        env->ExceptionClear();
-        return false;
-    }
-
-    return true;
-}
 
 void XposedBridge_hookMethodNative(JNIEnv* env, jclass, jobject javaReflectedMethod,
             jobject, jint, jobject javaAdditionalInfo) {

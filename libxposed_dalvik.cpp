@@ -25,7 +25,6 @@ void XposedBridge_invokeOriginalMethodNative(const u4* args, JValue* pResult, co
 // Variables
 ////////////////////////////////////////////////////////////
 
-static Method* xposedHandleHookedMethod = NULL;
 static ClassObject* objectArrayClass = NULL;
 static size_t arrayContentsOffset = 0;
 static void* PTR_gDvmJit = NULL;
@@ -38,15 +37,14 @@ static void* PTR_gDvmJit = NULL;
 /** Called by Xposed's app_process replacement. */
 bool xposedInitLib(xposed::XposedShared* shared) {
     xposed = shared;
-
-    xposed->onVmCreated = &onVmCreated;
+    xposed->onVmCreated = &onVmCreatedCommon;
     return true;
 }
 
 /** Called very early during VM startup. */
-void onVmCreated(JNIEnv* env) {
+bool onVmCreated(JNIEnv* env) {
     if (!initMemberOffsets(env))
-        return;
+        return false;
 
     jclass classMiuiResources = env->FindClass(CLASS_MIUI_RESOURCES);
     if (classMiuiResources != NULL) {
@@ -58,34 +56,25 @@ void onVmCreated(JNIEnv* env) {
     }
     env->ExceptionClear();
 
-    jclass classXTypedArray = env->FindClass(CLASS_XTYPED_ARRAY);
-    if (classXTypedArray == NULL) {
-        ALOGE("Error while loading XTypedArray class '%s':", CLASS_XTYPED_ARRAY);
+    Method* xposedInvokeOriginalMethodNative = (Method*) env->GetStaticMethodID(classXposedBridge, "invokeOriginalMethodNative",
+        "(Ljava/lang/reflect/Member;I[Ljava/lang/Class;Ljava/lang/Class;Ljava/lang/Object;[Ljava/lang/Object;)Ljava/lang/Object;");
+    if (xposedInvokeOriginalMethodNative == NULL) {
+        ALOGE("ERROR: could not find method %s.invokeOriginalMethodNative(Member, int, Class[], Class, Object, Object[])", CLASS_XPOSED_BRIDGE);
         dvmLogExceptionStackTrace();
         env->ExceptionClear();
-        return;
+        return false;
     }
-    prepareSubclassReplacement(classXTypedArray);
+    dvmSetNativeFunc(xposedInvokeOriginalMethodNative, XposedBridge_invokeOriginalMethodNative, NULL);
 
-    classXposedBridge = env->FindClass(CLASS_XPOSED_BRIDGE);
-    classXposedBridge = reinterpret_cast<jclass>(env->NewGlobalRef(classXposedBridge));
-
-    if (classXposedBridge == NULL) {
-        ALOGE("Error while loading Xposed class '%s':", CLASS_XPOSED_BRIDGE);
+    objectArrayClass = dvmFindArrayClass("[Ljava/lang/Object;", NULL);
+    if (objectArrayClass == NULL) {
+        ALOGE("Error while loading Object[] class");
         dvmLogExceptionStackTrace();
         env->ExceptionClear();
-        return;
+        return false;
     }
 
-    ALOGI("Found Xposed class '%s', now initializing", CLASS_XPOSED_BRIDGE);
-    if (register_natives_XposedBridge(env, classXposedBridge) != JNI_OK) {
-        ALOGE("Could not register natives for '%s'", CLASS_XPOSED_BRIDGE);
-        dvmLogExceptionStackTrace();
-        env->ExceptionClear();
-        return;
-    }
-
-    xposedLoadedSuccessfully = true;
+    return true;
 }
 
 bool initMemberOffsets(JNIEnv* env) {
@@ -141,7 +130,7 @@ inline void setObjectArrayElement(const ArrayObject* obj, int index, Object* val
 }
 
 /** Lay the foundations for XposedBridge.setObjectClassNative() */
-void prepareSubclassReplacement(jclass clazz) {
+void prepareSubclassReplacement(JNIEnv*, jclass clazz) {
     // clazz is supposed to replace its superclass, so make sure enough memory is allocated
     ClassObject* sub = (ClassObject*) dvmDecodeIndirectRef(dvmThreadSelf(), clazz);
     ClassObject* super = sub->super;
@@ -161,37 +150,6 @@ inline bool isMethodHooked(const Method* method) {
 ////////////////////////////////////////////////////////////
 // JNI methods
 ////////////////////////////////////////////////////////////
-
-jboolean callback_XposedBridge_initNative(JNIEnv* env) {
-    xposedHandleHookedMethod = (Method*) env->GetStaticMethodID(classXposedBridge, "handleHookedMethod",
-        "(Ljava/lang/reflect/Member;ILjava/lang/Object;Ljava/lang/Object;[Ljava/lang/Object;)Ljava/lang/Object;");
-    if (xposedHandleHookedMethod == NULL) {
-        ALOGE("ERROR: could not find method %s.handleHookedMethod(Member, int, Object, Object, Object[])", CLASS_XPOSED_BRIDGE);
-        dvmLogExceptionStackTrace();
-        env->ExceptionClear();
-        return false;
-    }
-
-    Method* xposedInvokeOriginalMethodNative = (Method*) env->GetStaticMethodID(classXposedBridge, "invokeOriginalMethodNative",
-        "(Ljava/lang/reflect/Member;I[Ljava/lang/Class;Ljava/lang/Class;Ljava/lang/Object;[Ljava/lang/Object;)Ljava/lang/Object;");
-    if (xposedInvokeOriginalMethodNative == NULL) {
-        ALOGE("ERROR: could not find method %s.invokeOriginalMethodNative(Member, int, Class[], Class, Object, Object[])", CLASS_XPOSED_BRIDGE);
-        dvmLogExceptionStackTrace();
-        env->ExceptionClear();
-        return false;
-    }
-    dvmSetNativeFunc(xposedInvokeOriginalMethodNative, XposedBridge_invokeOriginalMethodNative, NULL);
-
-    objectArrayClass = dvmFindArrayClass("[Ljava/lang/Object;", NULL);
-    if (objectArrayClass == NULL) {
-        ALOGE("Error while loading Object[] class");
-        dvmLogExceptionStackTrace();
-        env->ExceptionClear();
-        return false;
-    }
-
-    return true;
-}
 
 /** This is called when a hooked method is executed. */
 void hookedMethodCallback(const u4* args, JValue* pResult, const Method* method, ::Thread* self) {
@@ -259,7 +217,7 @@ void hookedMethodCallback(const u4* args, JValue* pResult, const Method* method,
 
     // call the Java handler function
     JValue result;
-    dvmCallMethod(self, xposedHandleHookedMethod, NULL, &result,
+    dvmCallMethod(self, (Method*) methodXposedBridgeHandleHookedMethod, NULL, &result,
         originalReflected, (int) original, additionalInfo, thisObject, argsArray);
 
     dvmReleaseTrackedAlloc(argsArray, self);
