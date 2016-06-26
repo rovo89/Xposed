@@ -156,23 +156,23 @@ void onVmCreatedCommon(JNIEnv* env) {
 // JNI methods
 ////////////////////////////////////////////////////////////
 
-jboolean XposedBridge_hadInitErrors(JNIEnv* env, jclass) {
+jboolean XposedBridge_hadInitErrors(JNIEnv*, jclass) {
     return !xposedLoadedSuccessfully;
 }
 
-jobject XposedBridge_getStartClassName(JNIEnv* env, jclass clazz) {
+jobject XposedBridge_getStartClassName(JNIEnv* env, jclass) {
     return env->NewStringUTF(xposed->startClassName);
 }
 
-jboolean XposedBridge_startsSystemServer(JNIEnv* env, jclass clazz) {
+jboolean XposedBridge_startsSystemServer(JNIEnv*, jclass) {
     return xposed->startSystemServer;
 }
 
-jint XposedBridge_getXposedVersion(JNIEnv* env, jclass clazz) {
+jint XposedBridge_getXposedVersion(JNIEnv*, jclass) {
     return xposed->xposedVersionInt;
 }
 
-jboolean XposedBridge_initXResourcesNative(JNIEnv* env, jclass clazz) {
+jboolean XposedBridge_initXResourcesNative(JNIEnv* env, jclass) {
     classXResources = env->FindClass(CLASS_XRESOURCES);
     if (classXResources == NULL) {
         ALOGE("Error while loading XResources class '%s':", CLASS_XRESOURCES);
@@ -209,7 +209,7 @@ jboolean XposedBridge_initXResourcesNative(JNIEnv* env, jclass clazz) {
     return true;
 }
 
-void XResources_rewriteXmlReferencesNative(JNIEnv* env, jclass clazz,
+void XResources_rewriteXmlReferencesNative(JNIEnv* env, jclass,
             jlong parserPtr, jobject origRes, jobject repRes) {
 
     using namespace android;
@@ -278,7 +278,7 @@ void XResources_rewriteXmlReferencesNative(JNIEnv* env, jclass clazz,
 }
 
 
-jboolean ZygoteService_checkFileAccess(JNIEnv* env, jclass clazz, jstring filenameJ, jint mode) {
+jboolean ZygoteService_checkFileAccess(JNIEnv* env, jclass, jstring filenameJ, jint mode) {
 #if XPOSED_WITH_SELINUX
     ScopedUtfChars filename(env, filenameJ);
     return xposed->zygoteservice_accessFile(filename.c_str(), mode) == 0;
@@ -287,7 +287,7 @@ jboolean ZygoteService_checkFileAccess(JNIEnv* env, jclass clazz, jstring filena
 #endif  // XPOSED_WITH_SELINUX
 }
 
-jobject ZygoteService_statFile(JNIEnv* env, jclass clazz, jstring filenameJ) {
+jobject ZygoteService_statFile(JNIEnv* env, jclass, jstring filenameJ) {
 #if XPOSED_WITH_SELINUX
     ScopedUtfChars filename(env, filenameJ);
 
@@ -308,7 +308,7 @@ jobject ZygoteService_statFile(JNIEnv* env, jclass clazz, jstring filenameJ) {
 #endif  // XPOSED_WITH_SELINUX
 }
 
-jbyteArray ZygoteService_readFile(JNIEnv* env, jclass clazz, jstring filenameJ) {
+jbyteArray ZygoteService_readFile(JNIEnv* env, jclass, jstring filenameJ) {
 #if XPOSED_WITH_SELINUX
     ScopedUtfChars filename(env, filenameJ);
 

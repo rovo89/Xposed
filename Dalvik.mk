@@ -28,6 +28,7 @@ else
   LOCAL_SHARED_LIBRARIES += libandroidfw
 endif
 
+LOCAL_CFLAGS := -Wall -Werror -Wextra -Wunused -Wno-unused-parameter
 LOCAL_CFLAGS += -DPLATFORM_SDK_VERSION=$(PLATFORM_SDK_VERSION)
 
 ifeq (1,$(strip $(shell expr $(PLATFORM_SDK_VERSION) \>= 17)))

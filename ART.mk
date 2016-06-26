@@ -35,7 +35,6 @@ LOCAL_SHARED_LIBRARIES += \
   libnativehelper
 
 LOCAL_CFLAGS += \
-  -Wno-unused-parameter \
   -DPLATFORM_SDK_VERSION=$(PLATFORM_SDK_VERSION) \
   -DXPOSED_WITH_SELINUX=1
 
@@ -44,7 +43,7 @@ LOCAL_MODULE_TAGS := optional
 LOCAL_STRIP_MODULE := keep_symbols
 LOCAL_MULTILIB := both
 
-# Always build both architecture (if applicable)
+# Always build both architectures (if applicable)
 ifeq ($(TARGET_IS_64_BIT),true)
   $(LOCAL_MODULE): $(LOCAL_MODULE)$(TARGET_2ND_ARCH_MODULE_SUFFIX)
 endif

@@ -40,7 +40,7 @@ bool xposedInitLib(XposedShared* shared) {
 }
 
 /** Called very early during VM startup. */
-bool onVmCreated(JNIEnv* env) {
+bool onVmCreated(JNIEnv*) {
     // TODO: Handle CLASS_MIUI_RESOURCES?
     ArtMethod::xposed_callback_class = classXposedBridge;
     ArtMethod::xposed_callback_method = methodXposedBridgeHandleHookedMethod;
@@ -141,7 +141,7 @@ jobject XposedBridge_cloneToSubclassNative(JNIEnv* env, jclass, jobject javaObje
     return soa.AddLocalReference<jobject>(dest);
 }
 
-jint XposedBridge_getRuntime(JNIEnv* env, jclass clazz) {
+jint XposedBridge_getRuntime(JNIEnv*, jclass) {
     return 2; // RUNTIME_ART
 }
 
