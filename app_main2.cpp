@@ -351,10 +351,11 @@ int main(int argc, char* const argv[])
         set_process_name(niceName.string());
     }
 
-    isXposedLoaded = xposed::initialize(zygote, startSystemServer, className, argc, argv);
     if (zygote) {
+        isXposedLoaded = xposed::initialize(true, startSystemServer, NULL, argc, argv);
         runtimeStart(runtime, isXposedLoaded ? XPOSED_CLASS_DOTS_ZYGOTE : "com.android.internal.os.ZygoteInit", args, zygote);
     } else if (className) {
+        isXposedLoaded = xposed::initialize(false, false, className, argc, argv);
         runtimeStart(runtime, isXposedLoaded ? XPOSED_CLASS_DOTS_TOOLS : "com.android.internal.os.RuntimeInit", args, zygote);
     } else {
         fprintf(stderr, "Error: no class name or --zygote supplied.\n");
