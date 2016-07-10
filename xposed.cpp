@@ -175,11 +175,18 @@ void printRomInfo() {
             xposed->isSELinuxEnforcing ? "yes" : "no");
 }
 
-/** Parses /system/xposed.prop and stores selected values in variables */
+void getPath(char* finalPath, const char* definePath) {
+    sprintf(finalPath, "%s%s", SYSTEMLESS_PATH, definePath);
+    if(access(finalPath, R_OK) == -1) sprintf(finalPath, "%s", definePath);
+}
+
+/** Parses xposed.prop and stores selected values in variables */
 void parseXposedProp() {
-    FILE *fp = fopen(XPOSED_PROP_FILE, "r");
+    char propPath[50];
+    getPath(propPath, XPOSED_PROP_FILE);
+    FILE *fp = fopen(propPath, "r");
     if (fp == NULL) {
-        ALOGE("Could not read %s: %s", XPOSED_PROP_FILE, strerror(errno));
+        ALOGE("Could not read %s: %s", propPath, strerror(errno));
         return;
     }
 
@@ -338,20 +345,23 @@ bool addJarToClasspath() {
     }
     */
 
-    if (access(XPOSED_JAR, R_OK) == 0) {
-        if (!addPathToEnv("CLASSPATH", XPOSED_JAR))
+    char jarPath[50];
+    getPath(jarPath, XPOSED_JAR);
+
+    if (access(jarPath, R_OK) == 0) {
+        if (!addPathToEnv("CLASSPATH", jarPath))
             return false;
 
-        ALOGI("Added Xposed (%s) to CLASSPATH", XPOSED_JAR);
+        ALOGI("Added Xposed (%s) to CLASSPATH", jarPath);
         return true;
     } else {
-        ALOGE("ERROR: Could not access Xposed jar '%s'", XPOSED_JAR);
+        ALOGE("ERROR: Could not access Xposed jar '%s'", jarPath);
         return false;
     }
 }
 
 /** Callback which checks the loaded shared libraries for libdvm/libart. */
-static bool determineRuntime(const char** xposedLibPath) {
+static bool determineRuntime(char* xposedLibPath) {
     FILE *fp = fopen("/proc/self/maps", "r");
     if (fp == NULL) {
         ALOGE("Could not open /proc/self/maps: %s", strerror(errno));
@@ -368,13 +378,13 @@ static bool determineRuntime(const char** xposedLibPath) {
 
         if (strcmp("libdvm.so\n", libname) == 0) {
             ALOGI("Detected Dalvik runtime");
-            *xposedLibPath = XPOSED_LIB_DALVIK;
+            getPath(xposedLibPath, XPOSED_LIB_DALVIK);
             success = true;
             break;
 
         } else if (strcmp("libart.so\n", libname) == 0) {
             ALOGI("Detected ART runtime");
-            *xposedLibPath = XPOSED_LIB_ART;
+            getPath(xposedLibPath, XPOSED_LIB_ART);
             success = true;
             break;
         }
@@ -387,8 +397,8 @@ static bool determineRuntime(const char** xposedLibPath) {
 /** Load the libxposed_*.so library for the currently active runtime. */
 void onVmCreated(JNIEnv* env) {
     // Determine the currently active runtime
-    const char* xposedLibPath = NULL;
-    if (!determineRuntime(&xposedLibPath)) {
+    char xposedLibPath[50];
+    if (!determineRuntime(xposedLibPath)) {
         ALOGE("Could not determine runtime, not loading Xposed");
         return;
     }
