@@ -175,7 +175,8 @@ void printRomInfo() {
             xposed->isSELinuxEnforcing ? "yes" : "no");
 }
 
-void getPath(char* finalPath, const char* definePath) {
+/** Get which path to use */
+static void getPath(char* finalPath, const char* definePath) {
     sprintf(finalPath, "%s%s", SYSTEMLESS_PATH, definePath);
     if(access(finalPath, R_OK) == -1) sprintf(finalPath, "%s", definePath);
 }
