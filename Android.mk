@@ -42,6 +42,10 @@ ifeq (1,$(strip $(shell expr $(PLATFORM_SDK_VERSION) \>= 22)))
   LOCAL_LDFLAGS := -Wl,--version-script,art/sigchainlib/version-script.txt -Wl,--export-dynamic
 endif
 
+ifeq (1,$(strip $(shell expr $(PLATFORM_SDK_VERSION) \>= 23)))
+  LOCAL_SHARED_LIBRARIES += libwilhelm
+endif
+
 LOCAL_MODULE := xposed
 LOCAL_MODULE_TAGS := optional
 LOCAL_STRIP_MODULE := keep_symbols

@@ -16,6 +16,7 @@
 #include <dlfcn.h>
 #include <errno.h>
 #include <fcntl.h>
+#include <inttypes.h>
 #include <stdlib.h>
 
 #if PLATFORM_SDK_VERSION >= 18
@@ -309,7 +310,7 @@ static bool addPathToEnv(const char* name, const char* path) {
         char newPath[4096];
         int neededLength = snprintf(newPath, sizeof(newPath), "%s:%s", path, oldPath);
         if (neededLength >= (int)sizeof(newPath)) {
-            ALOGE("ERROR: %s would exceed %d characters", name, sizeof(newPath));
+            ALOGE("ERROR: %s would exceed %" PRIuPTR " characters", name, sizeof(newPath));
             return false;
         }
         setenv(name, newPath, 1);
