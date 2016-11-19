@@ -352,13 +352,15 @@ int register_natives_XposedBridge(JNIEnv* env, jclass clazz) {
         NATIVE_METHOD(XposedBridge, getXposedVersion, "()I"),
         NATIVE_METHOD(XposedBridge, initXResourcesNative, "()Z"),
         NATIVE_METHOD(XposedBridge, hookMethodNative, "(Ljava/lang/reflect/Member;Ljava/lang/Class;ILjava/lang/Object;)V"),
-#ifdef ART_TARGET
-        NATIVE_METHOD(XposedBridge, invokeOriginalMethodNative,
-            "!(Ljava/lang/reflect/Member;I[Ljava/lang/Class;Ljava/lang/Class;Ljava/lang/Object;[Ljava/lang/Object;)Ljava/lang/Object;"),
-#endif
         NATIVE_METHOD(XposedBridge, setObjectClassNative, "(Ljava/lang/Object;Ljava/lang/Class;)V"),
         NATIVE_METHOD(XposedBridge, dumpObjectNative, "(Ljava/lang/Object;)V"),
         NATIVE_METHOD(XposedBridge, cloneToSubclassNative, "(Ljava/lang/Object;Ljava/lang/Class;)Ljava/lang/Object;"),
+#if PLATFORM_SDK_VERSION >= 21
+        NATIVE_METHOD(XposedBridge, invokeOriginalMethodNative,
+            "!(Ljava/lang/reflect/Member;I[Ljava/lang/Class;Ljava/lang/Class;Ljava/lang/Object;[Ljava/lang/Object;)Ljava/lang/Object;"),
+        NATIVE_METHOD(XposedBridge, closeFilesBeforeForkNative, "()V"),
+        NATIVE_METHOD(XposedBridge, reopenFilesAfterForkNative, "()V"),
+#endif
     };
     return env->RegisterNatives(clazz, methods, NELEM(methods));
 }

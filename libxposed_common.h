@@ -44,9 +44,11 @@ extern void    XposedBridge_setObjectClassNative(JNIEnv* env, jclass clazz, jobj
 extern jobject XposedBridge_cloneToSubclassNative(JNIEnv* env, jclass clazz, jobject objIndirect, jclass clzIndirect);
 extern void    XposedBridge_dumpObjectNative(JNIEnv* env, jclass clazz, jobject objIndirect);
 
-#ifdef ART_TARGET
-extern jobject XposedBridge_invokeOriginalMethodNative(JNIEnv* env, jclass, jobject javaMethod,
-    jint, jobjectArray, jclass, jobject javaReceiver, jobjectArray javaArgs);
+#if PLATFORM_SDK_VERSION >= 21
+extern jobject XposedBridge_invokeOriginalMethodNative(JNIEnv* env, jclass, jobject javaMethod, jint, jobjectArray,
+                                                       jclass, jobject javaReceiver, jobjectArray javaArgs);
+extern void    XposedBridge_closeFilesBeforeForkNative(JNIEnv* env, jclass clazz);
+extern void    XposedBridge_reopenFilesAfterForkNative(JNIEnv* env, jclass clazz);
 #endif
 
 }  // namespace xposed

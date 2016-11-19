@@ -2,8 +2,11 @@
  * This file includes functions specific to the ART runtime.
  */
 
+#define LOG_TAG "Xposed"
+
 #include "xposed_shared.h"
 #include "libxposed_common.h"
+#include "fd_utils-inl.h"
 
 #include "thread.h"
 #include "common_throws.h"
@@ -143,6 +146,18 @@ jobject XposedBridge_cloneToSubclassNative(JNIEnv* env, jclass, jobject javaObje
 
 jint XposedBridge_getRuntime(JNIEnv*, jclass) {
     return 2; // RUNTIME_ART
+}
+
+static FileDescriptorTable* gClosedFdTable = NULL;
+
+void XposedBridge_closeFilesBeforeForkNative(JNIEnv*, jclass) {
+    gClosedFdTable = FileDescriptorTable::Create();
+}
+
+void XposedBridge_reopenFilesAfterForkNative(JNIEnv*, jclass) {
+    gClosedFdTable->Reopen();
+    delete gClosedFdTable;
+    gClosedFdTable = NULL;
 }
 
 }  // namespace xposed
