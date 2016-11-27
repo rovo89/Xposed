@@ -175,11 +175,19 @@ void printRomInfo() {
             xposed->isSELinuxEnforcing ? "yes" : "no");
 }
 
-/** Parses /system/xposed.prop and stores selected values in variables */
+/** Get which path to use */
+static void getPath(char* finalPath, const char* definePath) {
+    sprintf(finalPath, "%s%s", SYSTEMLESS_PATH, definePath);
+    if(access(finalPath, R_OK) == -1) sprintf(finalPath, "%s", definePath);
+}
+
+/** Parses xposed.prop and stores selected values in variables */
 void parseXposedProp() {
-    FILE *fp = fopen(XPOSED_PROP_FILE, "r");
+    char propPath[50];
+    getPath(propPath, XPOSED_PROP_FILE);
+    FILE *fp = fopen(propPath, "r");
     if (fp == NULL) {
-        ALOGE("Could not read %s: %s", XPOSED_PROP_FILE, strerror(errno));
+        ALOGE("Could not read %s: %s", propPath, strerror(errno));
         return;
     }
 
@@ -238,7 +246,9 @@ int getSdkVersion() {
 
 /** Check whether Xposed is disabled by a flag file */
 bool isDisabled() {
-    if (zygote_access(XPOSED_LOAD_BLOCKER, F_OK) == 0) {
+    // Prevent the flag file on Samsung Roms
+    // Because we need to run TouchWiz hooks
+    if (zygote_access(XPOSED_LOAD_BLOCKER, F_OK) == 0 && zygote_access(SAMSUNG_TW_JAR, F_OK) != 0) {
         ALOGE("Found %s, not loading Xposed", XPOSED_LOAD_BLOCKER);
         return true;
     }
@@ -259,7 +269,10 @@ bool isSafemodeDisabled() {
     if (zygote_access(XPOSED_SAFEMODE_DISABLE, F_OK) == 0)
         return true;
     else
-        return false;
+        // Disable Xposed safe mode on Samsung Roms
+        // Samsung Knox/Mdpp will reject xposed art libraries and lead to
+        // a bootloop if TW hooks are not executed on Xposed Bridge
+        return (zygote_access(SAMSUNG_TW_JAR, F_OK) == 0);
 }
 
 /** Check whether the delay for safemode should be skipped. */
@@ -333,20 +346,23 @@ bool addJarToClasspath() {
     }
     */
 
-    if (access(XPOSED_JAR, R_OK) == 0) {
-        if (!addPathToEnv("CLASSPATH", XPOSED_JAR))
+    char jarPath[50];
+    getPath(jarPath, XPOSED_JAR);
+
+    if (access(jarPath, R_OK) == 0) {
+        if (!addPathToEnv("CLASSPATH", jarPath))
             return false;
 
-        ALOGI("Added Xposed (%s) to CLASSPATH", XPOSED_JAR);
+        ALOGI("Added Xposed (%s) to CLASSPATH", jarPath);
         return true;
     } else {
-        ALOGE("ERROR: Could not access Xposed jar '%s'", XPOSED_JAR);
+        ALOGE("ERROR: Could not access Xposed jar '%s'", jarPath);
         return false;
     }
 }
 
 /** Callback which checks the loaded shared libraries for libdvm/libart. */
-static bool determineRuntime(const char** xposedLibPath) {
+static bool determineRuntime(char* xposedLibPath) {
     FILE *fp = fopen("/proc/self/maps", "r");
     if (fp == NULL) {
         ALOGE("Could not open /proc/self/maps: %s", strerror(errno));
@@ -363,13 +379,13 @@ static bool determineRuntime(const char** xposedLibPath) {
 
         if (strcmp("libdvm.so\n", libname) == 0) {
             ALOGI("Detected Dalvik runtime");
-            *xposedLibPath = XPOSED_LIB_DALVIK;
+            getPath(xposedLibPath, XPOSED_LIB_DALVIK);
             success = true;
             break;
 
         } else if (strcmp("libart.so\n", libname) == 0) {
             ALOGI("Detected ART runtime");
-            *xposedLibPath = XPOSED_LIB_ART;
+            getPath(xposedLibPath, XPOSED_LIB_ART);
             success = true;
             break;
         }
@@ -382,8 +398,8 @@ static bool determineRuntime(const char** xposedLibPath) {
 /** Load the libxposed_*.so library for the currently active runtime. */
 void onVmCreated(JNIEnv* env) {
     // Determine the currently active runtime
-    const char* xposedLibPath = NULL;
-    if (!determineRuntime(&xposedLibPath)) {
+    char xposedLibPath[50];
+    if (!determineRuntime(xposedLibPath)) {
         ALOGE("Could not determine runtime, not loading Xposed");
         return;
     }
