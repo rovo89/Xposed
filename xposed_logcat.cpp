@@ -8,6 +8,7 @@
 #include <errno.h>
 #include <fcntl.h>
 #include <stdlib.h>
+#include <sys/prctl.h>
 #include <unistd.h>
 
 #include "xposed.h"
@@ -33,7 +34,11 @@ char marker[50];
 
 static void execLogcat() {
     // Ensure that we're allowed to read all log entries
+    if (prctl(PR_SET_KEEPCAPS, 1, 0, 0, 0) < 0) {
+        ALOGE("Failed to keep capabilities: %s", strerror(errno));
+    }
     setresgid(AID_LOG, AID_LOG, AID_LOG);
+    setresuid(AID_LOG, AID_LOG, AID_LOG);
     int8_t keep[] = { CAP_SYSLOG, -1 };
     xposed::dropCapabilities(keep);
 
