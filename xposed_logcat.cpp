@@ -154,6 +154,7 @@ void start() {
         ALOGE("Could not allocate pipe for logcat output: %s", strerror(errno));
         exit(EXIT_FAILURE);
     }
+    fcntl(pipeFds[0], F_SETPIPE_SZ, 1048576);
 
     if ((pid = fork()) < 0) {
         ALOGE("Fork for logcat execution failed: %s", strerror(errno));
