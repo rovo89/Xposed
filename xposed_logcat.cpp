@@ -165,9 +165,6 @@ void start() {
         ALOGE("Fork for logcat execution failed: %s", strerror(errno));
         exit(EXIT_FAILURE);
     } else if (pid == 0) {
-        close(pipeFds[1]);
-        runDaemon(pipeFds[0]);
-    } else {
         close(pipeFds[0]);
         if (dup2(pipeFds[1], STDOUT_FILENO) == -1) {
             ALOGE("Could not redirect stdout: %s", strerror(errno));
@@ -178,6 +175,9 @@ void start() {
             exit(EXIT_FAILURE);
         }
         execLogcat();
+    } else {
+        close(pipeFds[1]);
+        runDaemon(pipeFds[0]);
     }
 
     // Should never reach this point
