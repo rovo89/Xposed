@@ -43,6 +43,7 @@ extern void    XposedBridge_hookMethodNative(JNIEnv* env, jclass clazz, jobject 
 extern void    XposedBridge_setObjectClassNative(JNIEnv* env, jclass clazz, jobject objIndirect, jclass clzIndirect);
 extern jobject XposedBridge_cloneToSubclassNative(JNIEnv* env, jclass clazz, jobject objIndirect, jclass clzIndirect);
 extern void    XposedBridge_dumpObjectNative(JNIEnv* env, jclass clazz, jobject objIndirect);
+extern void    XposedBridge_removeFinalFlagNative(JNIEnv* env, jclass clazz, jclass javaClazz);
 
 #if PLATFORM_SDK_VERSION >= 21
 extern jobject XposedBridge_invokeOriginalMethodNative(JNIEnv* env, jclass, jobject javaMethod, jint, jobjectArray,

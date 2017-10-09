@@ -145,6 +145,15 @@ jobject XposedBridge_cloneToSubclassNative(JNIEnv* env, jclass, jobject javaObje
     return soa.AddLocalReference<jobject>(dest);
 }
 
+void XposedBridge_removeFinalFlagNative(JNIEnv* env, jclass, jclass javaClazz) {
+    ScopedObjectAccess soa(env);
+    mirror::Class* clazz = soa.Decode<mirror::Class*>(javaClazz);
+    uint32_t flags = clazz->GetAccessFlags();
+    if ((flags & kAccFinal) != 0) {
+        clazz->SetAccessFlags(flags & ~kAccFinal);
+    }
+}
+
 jint XposedBridge_getRuntime(JNIEnv*, jclass) {
     return 2; // RUNTIME_ART
 }
