@@ -16,7 +16,6 @@ namespace xposed {
 ////////////////////////////////////////////////////////////
 
 bool initMemberOffsets(JNIEnv* env);
-void prepareSubclassReplacement(jclass clazz);
 void hookedMethodCallback(const u4* args, JValue* pResult, const Method* method, ::Thread* self);
 void XposedBridge_invokeOriginalMethodNative(const u4* args, JValue* pResult, const Method* method, ::Thread* self);
 
@@ -127,14 +126,6 @@ inline void setObjectArrayElement(const ArrayObject* obj, int index, Object* val
     uintptr_t arrayContents = (uintptr_t)obj + arrayContentsOffset;
     ((Object **)arrayContents)[index] = val;
     dvmWriteBarrierArray(obj, index, index + 1);
-}
-
-/** Lay the foundations for XposedBridge.setObjectClassNative() */
-void prepareSubclassReplacement(JNIEnv*, jclass clazz) {
-    // clazz is supposed to replace its superclass, so make sure enough memory is allocated
-    ClassObject* sub = (ClassObject*) dvmDecodeIndirectRef(dvmThreadSelf(), clazz);
-    ClassObject* super = sub->super;
-    super->objectSize = sub->objectSize;
 }
 
 /** Wrapper used by the common part of the library. */

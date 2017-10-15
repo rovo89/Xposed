@@ -64,16 +64,6 @@ void logExceptionStackTrace() {
 #endif
 }
 
-/** Lay the foundations for XposedBridge.setObjectClassNative() */
-void prepareSubclassReplacement(JNIEnv* env, jclass clazz) {
-    // clazz is supposed to replace its superclass, so make sure enough memory is allocated
-    ScopedObjectAccess soa(env);
-    mirror::Class* sub = soa.Decode<mirror::Class*>(clazz);
-    mirror::Class* super = sub->GetSuperClass();
-    super->SetObjectSize(sub->GetObjectSize());
-}
-
-
 ////////////////////////////////////////////////////////////
 // JNI methods
 ////////////////////////////////////////////////////////////
@@ -128,6 +118,18 @@ void XposedBridge_setObjectClassNative(JNIEnv* env, jclass, jobject javaObj, jcl
         return;
     }
     mirror::Object* obj = soa.Decode<mirror::Object*>(javaObj);
+    mirror::Class* currentClass = obj->GetClass();
+    if (clazz->GetObjectSize() != currentClass->GetObjectSize()) {
+        std::string msg = StringPrintf("Different object sizes: %s (%d) vs. %s (%d)",
+                PrettyClass(clazz).c_str(), clazz->GetObjectSize(),
+                PrettyClass(currentClass).c_str(), currentClass->GetObjectSize());
+#if PLATFORM_SDK_VERSION >= 23
+        ThrowIllegalArgumentException(msg.c_str());
+#else
+        ThrowIllegalArgumentException(nullptr, msg.c_str());
+#endif
+        return;
+    }
     obj->SetClass(clazz);
 }
 

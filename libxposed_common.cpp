@@ -134,15 +134,6 @@ void onVmCreatedCommon(JNIEnv* env) {
         return;
     }
 
-    jclass classXTypedArray = env->FindClass(CLASS_XTYPED_ARRAY);
-    if (classXTypedArray == NULL) {
-        ALOGE("Error while loading XTypedArray class '%s':", CLASS_XTYPED_ARRAY);
-        logExceptionStackTrace();
-        env->ExceptionClear();
-        return;
-    }
-    prepareSubclassReplacement(env, classXTypedArray);
-
     if (!onVmCreated(env)) {
         return;
     }
