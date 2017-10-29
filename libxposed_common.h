@@ -50,6 +50,9 @@ extern jobject XposedBridge_invokeOriginalMethodNative(JNIEnv* env, jclass, jobj
 extern void    XposedBridge_closeFilesBeforeForkNative(JNIEnv* env, jclass clazz);
 extern void    XposedBridge_reopenFilesAfterForkNative(JNIEnv* env, jclass clazz);
 #endif
+#if PLATFORM_SDK_VERSION >= 24
+extern void    XposedBridge_invalidateCallersNative(JNIEnv*, jclass, jobjectArray javaMethods);
+#endif
 
 }  // namespace xposed
 

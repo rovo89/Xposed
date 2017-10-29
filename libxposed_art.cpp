@@ -22,6 +22,11 @@
 #include "scoped_thread_state_change.h"
 #include "well_known_classes.h"
 
+#if PLATFORM_SDK_VERSION >= 24
+#include "mirror/abstract_method.h"
+#include "thread_list.h"
+#endif
+
 using namespace art;
 
 #if PLATFORM_SDK_VERSION < 23
@@ -171,5 +176,31 @@ void XposedBridge_reopenFilesAfterForkNative(JNIEnv*, jclass) {
     delete gClosedFdTable;
     gClosedFdTable = NULL;
 }
+
+#if PLATFORM_SDK_VERSION >= 24
+void XposedBridge_invalidateCallersNative(JNIEnv* env, jclass, jobjectArray javaMethods) {
+    ScopedObjectAccess soa(env);
+    auto* runtime = Runtime::Current();
+    auto* cl = runtime->GetClassLinker();
+
+    // Invalidate callers of the given methods.
+    auto* abstract_methods = soa.Decode<mirror::ObjectArray<mirror::AbstractMethod>*>(javaMethods);
+    size_t count = abstract_methods->GetLength();
+    for (size_t i = 0; i < count; i++) {
+        auto* abstract_method = abstract_methods->Get(i);
+        if (abstract_method == nullptr) {
+            continue;
+        }
+        ArtMethod* method = abstract_method->GetArtMethod();
+        cl->InvalidateCallersForMethod(soa.Self(), method);
+    }
+
+    // Now instrument the stack to deoptimize methods which are being called right now.
+    MutexLock mu(soa.Self(), *Locks::thread_list_lock_);
+    runtime->GetThreadList()->ForEach([](Thread* thread, void*) SHARED_REQUIRES(Locks::mutator_lock_) {
+        Runtime::Current()->GetInstrumentation()->InstrumentThreadStack(thread);
+    }, nullptr);
+}
+#endif
 
 }  // namespace xposed

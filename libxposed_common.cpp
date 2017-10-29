@@ -353,6 +353,9 @@ int register_natives_XposedBridge(JNIEnv* env, jclass clazz) {
         NATIVE_METHOD(XposedBridge, closeFilesBeforeForkNative, "()V"),
         NATIVE_METHOD(XposedBridge, reopenFilesAfterForkNative, "()V"),
 #endif
+#if PLATFORM_SDK_VERSION >= 24
+        NATIVE_METHOD(XposedBridge, invalidateCallersNative, "([Ljava/lang/reflect/Member;)V"),
+#endif
     };
     return env->RegisterNatives(clazz, methods, NELEM(methods));
 }
