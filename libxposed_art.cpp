@@ -200,6 +200,8 @@ void XposedBridge_invalidateCallersNative(JNIEnv* env, jclass, jobjectArray java
     }
 
     // Now instrument the stack to deoptimize methods which are being called right now.
+    ScopedThreadSuspension sts(soa.Self(), kSuspended);
+    ScopedSuspendAll ssa(__FUNCTION__);
     MutexLock mu(soa.Self(), *Locks::thread_list_lock_);
     runtime->GetThreadList()->ForEach([](Thread* thread, void*) SHARED_REQUIRES(Locks::mutator_lock_) {
         Runtime::Current()->GetInstrumentation()->InstrumentThreadStack(thread);
