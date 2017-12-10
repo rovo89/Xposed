@@ -18,6 +18,8 @@
 #include <fcntl.h>
 #include <inttypes.h>
 #include <stdlib.h>
+#include <sys/mman.h>
+#include <sys/wait.h>
 
 #if PLATFORM_SDK_VERSION >= 18
 #include <sys/capability.h>
@@ -110,7 +112,7 @@ bool initialize(bool zygote, bool startSystemServer, const char* className, int 
     printRomInfo();
 
     if (startSystemServer) {
-        if (!xposed::service::startAll()) {
+        if (!determineXposedInstallerUidGid() || !xposed::service::startAll()) {
             return false;
         }
         xposed::logcat::start();
@@ -425,6 +427,73 @@ void setProcessName(const char* name) {
     set_process_name(name);
 }
 
+/** Determine the UID/GID of Xposed Installer. */
+bool determineXposedInstallerUidGid() {
+    if (xposed->isSELinuxEnabled) {
+        struct stat* st = (struct stat*) mmap(NULL, sizeof(struct stat), PROT_READ | PROT_WRITE, MAP_SHARED | MAP_ANONYMOUS, -1, 0);
+        if (st == MAP_FAILED) {
+            ALOGE("Could not allocate memory in determineXposedInstallerUidGid(): %s", strerror(errno));
+            return false;
+        }
+
+        pid_t pid;
+        if ((pid = fork()) < 0) {
+            ALOGE("Fork in determineXposedInstallerUidGid() failed: %s", strerror(errno));
+            munmap(st, sizeof(struct stat));
+            return false;
+        } else if (pid == 0) {
+            // Child.
+#if XPOSED_WITH_SELINUX
+            if (setcon(ctx_app) != 0) {
+                ALOGE("Could not switch to %s context", ctx_app);
+                exit(EXIT_FAILURE);
+            }
+#endif  // XPOSED_WITH_SELINUX
+
+            if (TEMP_FAILURE_RETRY(stat(XPOSED_DIR, st)) != 0) {
+                ALOGE("Could not stat %s: %s", XPOSED_DIR, strerror(errno));
+                exit(EXIT_FAILURE);
+            }
+
+            exit(EXIT_SUCCESS);
+        }
+
+        // Parent.
+        int status;
+        if (waitpid(pid, &status, 0) == -1 || !WIFEXITED(status) || WEXITSTATUS(status) != 0) {
+            munmap(st, sizeof(struct stat));
+            return false;
+        }
+
+        xposed->installer_uid = st->st_uid;
+        xposed->installer_gid = st->st_gid;
+        munmap(st, sizeof(struct stat));
+        return true;
+    } else {
+        struct stat st;
+        if (TEMP_FAILURE_RETRY(stat(XPOSED_DIR, &st)) != 0) {
+            ALOGE("Could not stat %s: %s", XPOSED_DIR, strerror(errno));
+            return false;
+        }
+
+        xposed->installer_uid = st.st_uid;
+        xposed->installer_gid = st.st_gid;
+        return true;
+    }
+}
+
+/** Switch UID/GID to the ones of Xposed Installer. */
+bool switchToXposedInstallerUidGid() {
+    if (setresgid(xposed->installer_gid, xposed->installer_gid, xposed->installer_gid) != 0) {
+        ALOGE("Could not setgid(%d): %s", xposed->installer_gid, strerror(errno));
+        return false;
+    }
+    if (setresuid(xposed->installer_uid, xposed->installer_uid, xposed->installer_uid) != 0) {
+        ALOGE("Could not setuid(%d): %s", xposed->installer_uid, strerror(errno));
+        return false;
+    }
+    return true;
+}
 
 /** Drop all capabilities except for the mentioned ones */
 void dropCapabilities(int8_t keep[]) {

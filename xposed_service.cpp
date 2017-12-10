@@ -641,7 +641,7 @@ int XposedService::test() const {
 status_t XposedService::addService(const String16& name, const sp<IBinder>& service,
         bool allowIsolated) const {
     uid_t uid = IPCThreadState::self()->getCallingUid();
-    if (!isSystem || (uid != 0)) {
+    if (!isSystem || (uid != xposed->installer_uid)) {
         ALOGE("Permission denied, not adding service %s", String8(name).string());
         errno = EPERM;
         return -1;
@@ -820,6 +820,9 @@ static void systemService() {
 
 static void appService(bool useSingleProcess) {
     xposed::setProcessName(useSingleProcess ? "xposed_service" : "xposed_service_app");
+    if (!xposed::switchToXposedInstallerUidGid()) {
+        exit(EXIT_FAILURE);
+    }
     xposed::dropCapabilities();
 
 #if XPOSED_WITH_SELINUX
@@ -894,7 +897,7 @@ bool checkMembasedRunning() {
 }
 
 bool startAll() {
-    bool useSingleProcess = !xposed->isSELinuxEnabled;
+    bool useSingleProcess = false;
     if (xposed->isSELinuxEnabled && !membased::init()) {
         return false;
     }
@@ -945,6 +948,9 @@ bool startMembased() {
         return false;
     } else if (pid == 0) {
         xposed::setProcessName("xposed_zygote_service");
+        if (!xposed::switchToXposedInstallerUidGid()) {
+            exit(EXIT_FAILURE);
+        }
         xposed::dropCapabilities();
         if (setcon(ctx_app) != 0) {
             ALOGE("Could not switch to %s context", ctx_app);

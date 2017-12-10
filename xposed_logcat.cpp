@@ -33,12 +33,6 @@ char marker[50];
 ////////////////////////////////////////////////////////////
 
 static void execLogcat() {
-    // Ensure that we're allowed to read all log entries
-    if (prctl(PR_SET_KEEPCAPS, 1, 0, 0, 0) < 0) {
-        ALOGE("Failed to keep capabilities: %s", strerror(errno));
-    }
-    setresgid(AID_LOG, AID_LOG, AID_LOG);
-    setresuid(AID_LOG, AID_LOG, AID_LOG);
     int8_t keep[] = { CAP_SYSLOG, -1 };
     xposed::dropCapabilities(keep);
 
@@ -140,6 +134,16 @@ void start() {
         return;
     }
 
+    // Ensure that we're allowed to read all log entries
+    if (prctl(PR_SET_KEEPCAPS, 1, 0, 0, 0) < 0) {
+        ALOGE("Failed to keep capabilities: %s", strerror(errno));
+    }
+    const gid_t groups[] = { AID_LOG };
+    setgroups(1, groups);
+    if (!xposed::switchToXposedInstallerUidGid()) {
+        exit(EXIT_FAILURE);
+    }
+
 #if XPOSED_WITH_SELINUX
     if (xposed->isSELinuxEnabled) {
         if (setcon(ctx_app) != 0) {
@@ -152,6 +156,7 @@ void start() {
     int err = rename(XPOSEDLOG, XPOSEDLOG_OLD);
     if (err < 0 && errno != ENOENT) {
         ALOGE("%s while renaming log file %s -> %s", strerror(errno), XPOSEDLOG, XPOSEDLOG_OLD);
+        exit(EXIT_FAILURE);
     }
 
     int pipeFds[2];
